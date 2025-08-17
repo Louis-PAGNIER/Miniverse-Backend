@@ -1,10 +1,19 @@
-from sqlalchemy import Column, Integer, String, UUID
+from sqlalchemy import String, Enum
+from sqlalchemy.orm import relationship, mapped_column, Mapped
+
 from app.db import Base
-from uuid import UUID, uuid4
+from uuid import uuid4
+
+from app.enums import Role
+
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid4()), index=True)
-    username = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    username: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[Role] = mapped_column(Enum(Role), nullable=False, default=Role.USER)
+
+    miniverse_roles = relationship("MiniverseUserRole", back_populates="user", cascade="all, delete-orphan")
+    proxy_roles = relationship("ProxyUserRole", back_populates="user", cascade="all, delete-orphan")

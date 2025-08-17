@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.schemas.user import UserCreate
@@ -10,5 +11,5 @@ def create_user(db: Session, user: UserCreate) -> User:
     db.refresh(db_user)
     return db_user
 
-def get_users(db: Session):
-    return db.query(User).all()
+def get_users(db: Session) -> list[User]:
+    return list(db.scalars(select(User)).all())

@@ -1,5 +1,8 @@
+from typing import Annotated, Generator
+
+from fastapi import Depends
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
@@ -9,9 +12,11 @@ engine = create_engine(
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def get_db():
+def get_db() -> Generator[Session]:
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+Db = Annotated[Session, Depends(get_db)]

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Annotated
 
 from jose import jwt, JWTError
 import bcrypt
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
+from app.enums import Role
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -38,3 +39,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+def get_moderator_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role < Role.MODERATOR:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    return current_user
+
+def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role < Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    return current_user
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
+ModeratorUser = Annotated[User, Depends(get_moderator_user)]
+AdminUser = Annotated[User, Depends(get_admin_user)]

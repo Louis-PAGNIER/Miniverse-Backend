@@ -1,14 +1,24 @@
-from fastapi import APIRouter
-from app import Db, CurrentUser
-from app.schemas.user import UserCreate, UserRead
+from litestar import get, post, Controller
+from litestar.di import Provide
+from litestar.params import Dependency
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db_session
+from app.models import User
+from app.schemas import UserRegistrationSchema
+from app.schemas.user import UserCreateDTO, UserReadDTO
 from app.services.user_service import create_user, get_users
 
-router = APIRouter()
 
-@router.get("/", response_model=list[UserRead])
-def list_users(db: Db, current_user: CurrentUser):
-    return get_users(db)
+class UsersController(Controller):
+    path = "/users"
+    dependencies = {"db": Provide(get_db_session)}
+    return_dto = UserReadDTO
 
-@router.post("/", response_model=UserRead)
-def register_user(user: UserCreate, db: Db):
-    return create_user(db, user)
+    @get("/")
+    async def list_users(self, db: AsyncSession) -> list[User]:
+        return await get_users(db)
+
+    @post("/")
+    async def create_user(self, data: UserRegistrationSchema, db: AsyncSession) -> User:
+        return await create_user(data, db)

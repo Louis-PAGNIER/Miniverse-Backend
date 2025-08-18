@@ -1,25 +1,19 @@
-from pydantic import BaseModel
 from uuid import UUID
+from dataclasses import dataclass
+from litestar.plugins.sqlalchemy import SQLAlchemyDTO
+from litestar.dto import DTOConfig, DataclassDTO
 
 from app.enums import Role
+from app.models import User
 
-
-class UserBase(BaseModel):
+@dataclass
+class UserRegistrationSchema:
     username: str
+    password: str
     role: Role = Role.USER
 
-class UserCreate(UserBase):
-    password: str
+class UserCreateDTO(DataclassDTO[UserRegistrationSchema]):
+    ...
 
-class UserUpdate(BaseModel):
-    username: str | None = None
-    password: str | None = None
-
-class UserReadMinimal(UserBase):  # utile dans MiniverseRead
-    id: UUID
-
-    class Config:
-        from_attributes = True
-
-class UserRead(UserReadMinimal):
-    pass
+class UserReadDTO(SQLAlchemyDTO[User]):
+    config = DTOConfig(exclude={"id", "hashed_password"})

@@ -1,15 +1,20 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
-from app.schemas.user import UserCreate
-from app.services.auth_service import get_password_hash
+from app.schemas import UserCreateDTO, UserRegistrationSchema
 
-def create_user(db: Session, user: UserCreate) -> User:
-    db_user = User(username=user.username, hashed_password=get_password_hash(user.password))
+
+#from app.services.auth_service import get_password_hash
+
+async def create_user(user: UserRegistrationSchema, db: AsyncSession) -> User:
+    #db_user = User(username=user.username, hashed_password=get_password_hash(user.password))
+    print(user)
+    db_user = User(username=user.username, hashed_password=user.password)
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
     return db_user
 
-def get_users(db: Session) -> list[User]:
-    return list(db.scalars(select(User)).all())
+async def get_users(db: AsyncSession) -> list[User]:
+    result = await db.execute(select(User))
+    return list(result.scalars().all())

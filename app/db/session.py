@@ -1,22 +1,13 @@
-from typing import Annotated, Generator
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
+from app.models import User, Miniverse, Proxy, MiniverseUserRole, ProxyUserRole
 
-from fastapi import Depends
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+async_session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def get_db() -> Generator[Session]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-Db = Annotated[Session, Depends(get_db)]
+async def get_db_session() -> AsyncGenerator[AsyncSession]:
+    async with async_session_factory() as session:
+        yield session

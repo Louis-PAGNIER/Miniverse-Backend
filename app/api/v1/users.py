@@ -1,24 +1,27 @@
-from litestar import get, post, Controller
+from typing import Any
+
+from litestar import get, post, Controller, Request
 from litestar.di import Provide
-from litestar.params import Dependency
+from litestar.security.jwt import Token
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.models import User
-from app.schemas import UserRegistrationSchema
-from app.schemas.user import UserCreateDTO, UserReadDTO
+from app.schemas import UserCreate
+from app.schemas.user import UserRead
 from app.services.user_service import create_user, get_users
 
 
 class UsersController(Controller):
     path = "/users"
     dependencies = {"db": Provide(get_db_session)}
-    return_dto = UserReadDTO
+    return_dto = UserRead
 
     @get("/")
-    async def list_users(self, db: AsyncSession) -> list[User]:
+    async def list_users(self, request: Request[User, Token, Any], db: AsyncSession) -> list[User]:
+        print(request)
         return await get_users(db)
 
     @post("/")
-    async def create_user(self, data: UserRegistrationSchema, db: AsyncSession) -> User:
+    async def create_user(self, data: UserCreate, db: AsyncSession) -> User:
         return await create_user(data, db)

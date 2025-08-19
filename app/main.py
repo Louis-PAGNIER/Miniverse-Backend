@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -7,6 +11,7 @@ from litestar.openapi.plugins import SwaggerRenderPlugin
 
 from app.db import Base, engine
 from app.api.v1 import UsersController
+from app.schemas import oauth2_auth, login
 
 
 @asynccontextmanager
@@ -20,13 +25,25 @@ async def db_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
 
 
 app = Litestar(
-    route_handlers=[UsersController],
+    route_handlers=[UsersController, login],
     lifespan=[db_lifespan],
+    on_app_init=[oauth2_auth.on_app_init],
     openapi_config=OpenAPIConfig(
         title="Miniverse API",
         version="0.0.1",
         description="API for Miniverse, a decentralized social network.",
-        render_plugins=[SwaggerRenderPlugin()],
+        render_plugins=[
+            SwaggerRenderPlugin(
+                init_oauth={
+                    "clientId": "miniverse-client",
+                    "appName": "Miniverse",
+                    "scopeSeparator": " ",
+                    "scopes": "openid profile",
+                    "useBasicAuthenticationWithAccessCodeGrant": True,
+                    "usePkceWithAuthorizationCodeGrant": True,
+                }
+            )
+        ],
         path="/docs"
     )
 )

@@ -31,7 +31,7 @@ app = Litestar(
     openapi_config=OpenAPIConfig(
         title="Miniverse API",
         version="0.0.1",
-        description="API for Miniverse, a decentralized social network.",
+        description="API for Miniverse, an open source self-hosted server manager.",
         render_plugins=[
             SwaggerRenderPlugin(
                 init_oauth={

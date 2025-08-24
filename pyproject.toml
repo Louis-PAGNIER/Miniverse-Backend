@@ -20,6 +20,9 @@ dependencies = [
     "aiosqlite (>=0.21.0,<0.22.0)",
     "greenlet (>=3.2.4,<4.0.0)",
     "advanced-alchemy (>=1.6.0,<2.0.0)",
+    "setuptools (>=80.9.0,<81.0.0)",
+    "docker (>=7.1.0,<8.0.0)",
+    "toml (>=0.10.2,<0.11.0)",
 ]
 
 

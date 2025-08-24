@@ -1,2 +1,2 @@
 from .user import *
-from .auth import *
+from .proxy import *

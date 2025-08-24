@@ -13,6 +13,7 @@ class Proxy(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
     name: Mapped[str] = mapped_column(String, nullable=False)
+    container_id: Mapped[str | None] = mapped_column(String, nullable=True)
     type: Mapped[ProxyType] = mapped_column(Enum(ProxyType), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     port: Mapped[int] = mapped_column(Integer, nullable=False)

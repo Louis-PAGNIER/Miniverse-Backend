@@ -21,12 +21,11 @@ async def generate_velocity_config(proxy: Proxy, db: AsyncSession):
 
         "servers": {
             #"lobby": "<container-id>:25565",
+            "try": [
+                # "lobby",
+                # "factions"
+            ],
         },
-
-        "try": [
-            # "lobby",
-            # "factions"
-        ],
 
         "forced-hosts": {
             #"localhost": ["lobby"],

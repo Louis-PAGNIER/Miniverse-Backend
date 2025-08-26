@@ -18,8 +18,8 @@ class Proxy(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     port: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    miniverses = relationship("Miniverse", back_populates="proxy")
-    user_roles = relationship("ProxyUserRole", back_populates="proxy", cascade="all, delete-orphan")
+    miniverses = relationship("Miniverse", back_populates="proxy", lazy="selectin")
+    user_roles = relationship("ProxyUserRole", back_populates="proxy", cascade="all, delete-orphan", lazy="selectin")
 
 
 class ProxyUserRole(Base):

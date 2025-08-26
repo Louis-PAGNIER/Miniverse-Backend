@@ -2,5 +2,6 @@
 .venv/
 .idea/
 .vscode/
+data/
 __pycache__/
 *.db

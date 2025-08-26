@@ -67,13 +67,18 @@ class AsyncDockerController:
                 print(f"Image {image} not found, pulling...")
                 self.client.images.pull(image)
 
+            volumes_dict = {}
+            if volumes:
+                for host_path, vol_cfg in volumes.items():
+                    volumes_dict[host_path] = vol_cfg.__dict__
+
             container = self.client.containers.create(
                 image,
                 name=name,
                 command=command,
                 detach=detach,
                 network=network_id,
-                volumes=volumes,
+                volumes=volumes_dict,
                 ports=ports,
                 environment=environment,
                 **kwargs

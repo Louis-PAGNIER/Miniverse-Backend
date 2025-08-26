@@ -10,8 +10,8 @@ from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import SwaggerRenderPlugin
 
 from app.db import Base, engine
-from app.api.v1 import UsersController
 from app.api.v1 import oauth2_auth, login
+from app.api.v1 import UsersController, ProxiesController
 
 from app.services.docker_service import dockerctl
 
@@ -32,7 +32,7 @@ async def docker_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
 
 
 app = Litestar(
-    route_handlers=[login, UsersController],
+    route_handlers=[login, UsersController, ProxiesController],
     lifespan=[db_lifespan, docker_lifespan],
     on_app_init=[oauth2_auth.on_app_init],
     openapi_config=OpenAPIConfig(

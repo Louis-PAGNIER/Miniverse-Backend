@@ -42,7 +42,7 @@ async def create_miniverse(miniverse: MiniverseCreate, db: AsyncSession) -> Mini
 
 async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> dict:
     logger.info(f"Creating miniverse container for miniverse {miniverse.name}")
-    container_name = "miniverse_" + miniverse.name
+    container_name = "miniverse-" + miniverse.id
 
     volume_base_path = MINIVERSES_VOLUME_PATH / miniverse.id
     volume_base_path.mkdir(parents=True)
@@ -55,7 +55,7 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
         name=container_name,
         network_id=settings.DOCKER_NETWORK_NAME,
         volumes={str(volume_data_path.resolve()): VolumeConfig(bind="/data")},
-        ports={"25565/tcp": None}, # TODO: Check this
+        ports={"25565/tcp": None},
         environment={
             "EULA": "TRUE",
             "TYPE": miniverse.type.value.upper(),

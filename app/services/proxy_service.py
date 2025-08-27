@@ -51,7 +51,7 @@ async def update_proxy_config(proxy: Proxy, db: AsyncSession, restart: bool = Tr
 
 async def create_proxy_container(proxy: Proxy, db: AsyncSession) -> dict:
     logger.info(f"Creating proxy container for proxy {proxy.name} on port {proxy.port}")
-    container_name = "miniverse_proxy_" + proxy.name
+    container_name = "miniverse-proxy-" + proxy.id
 
     volume_base_path = PROXIES_VOLUME_PATH / proxy.id
     volume_base_path.mkdir(parents=True)

@@ -1,4 +1,3 @@
-import enum
 from uuid import uuid4
 
 from sqlalchemy import String, Enum, Text, Integer, ForeignKey
@@ -19,7 +18,7 @@ class Proxy(Base):
     port: Mapped[int] = mapped_column(Integer, nullable=False)
 
     miniverses = relationship("Miniverse", back_populates="proxy", lazy="selectin")
-    user_roles = relationship("ProxyUserRole", back_populates="proxy", cascade="all, delete-orphan", lazy="selectin")
+    users_roles = relationship("ProxyUserRole", back_populates="proxy", cascade="all, delete-orphan", lazy="selectin")
 
 
 class ProxyUserRole(Base):
@@ -29,5 +28,5 @@ class ProxyUserRole(Base):
     proxy_id: Mapped[str] = mapped_column(String, ForeignKey("proxies.id"), primary_key=True)
     role: Mapped[Role] = mapped_column(Enum(Role), nullable=False)
 
-    user = relationship("User", back_populates="proxy_roles")
-    proxy = relationship("Proxy", back_populates="user_roles")
+    user = relationship("User", back_populates="proxies_roles")
+    proxy = relationship("Proxy", back_populates="users_roles")

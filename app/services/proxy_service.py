@@ -40,7 +40,7 @@ async def create_proxy(proxy: ProxyCreate, db: AsyncSession) -> Proxy:
     return db_proxy
 
 
-async def update_velocity_config(proxy: Proxy, db: AsyncSession, restart: bool = True):
+async def update_proxy_config(proxy: Proxy, db: AsyncSession, restart: bool = True):
     volume_config_path = PROXIES_VOLUME_PATH / proxy.id / "config" / "velocity.toml"
     config = await generate_velocity_config(proxy, db)
     with open(volume_config_path, "w") as f:
@@ -69,7 +69,7 @@ async def create_proxy_container(proxy: Proxy, db: AsyncSession) -> dict:
     with open(forwarding_secret_path, "w") as f:
         f.write(str(uuid4()))
 
-    await update_velocity_config(proxy, db, restart=False)
+    await update_proxy_config(proxy, db, restart=False)
 
     container = await dockerctl.create_container(
         image="itzg/mc-proxy",

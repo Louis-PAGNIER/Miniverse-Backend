@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.models import User
-from app.schemas.user import UserRead, UserCreate
+from app.schemas import UserRead, UserCreate
 from app.services.user_service import create_user, get_users
 
 

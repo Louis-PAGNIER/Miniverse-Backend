@@ -57,10 +57,11 @@ async def generate_velocity_config(proxy: Proxy, db: AsyncSession):
     }
 
     await db.refresh(proxy, attribute_names=["miniverses"])
+
     mv: Miniverse
     for mv in proxy.miniverses:
         config["servers"][mv.id] = f"{mv.container_id}:25565"
-        config["try"].append(mv.id)
+        config["servers"]["try"].append(mv.id)
         config["forced-hosts"][f"{mv.subdomain}.miniverse.fr"] = [mv.id]
 
     return config

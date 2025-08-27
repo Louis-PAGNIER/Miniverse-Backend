@@ -15,5 +15,5 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[Role] = mapped_column(Enum(Role), nullable=False, default=Role.USER)
 
-    miniverse_roles = relationship("MiniverseUserRole", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
-    proxy_roles = relationship("ProxyUserRole", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    miniverses_roles = relationship("MiniverseUserRole", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    proxies_roles = relationship("ProxyUserRole", back_populates="user", cascade="all, delete-orphan", lazy="selectin")

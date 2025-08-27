@@ -1,9 +1,14 @@
 from dataclasses import dataclass
 
 from advanced_alchemy.extensions.litestar import SQLAlchemyDTO
+from litestar.dto import DTOConfig
 
 from app.enums import ProxyType
 from app.models import Proxy
+
+
+class ProxyRead(SQLAlchemyDTO[Proxy]):
+    config = DTOConfig(exclude={"miniverses", "users_roles"})
 
 
 @dataclass
@@ -12,8 +17,3 @@ class ProxyCreate:
     type: ProxyType
     port: int
     description: str | None = None
-
-
-class ProxyRead(SQLAlchemyDTO[Proxy]):
-    ...
-

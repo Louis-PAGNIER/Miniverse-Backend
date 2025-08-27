@@ -51,12 +51,15 @@ class AsyncDockerController:
     async def create_container(
         self,
         image: str,
+        *,
         name: str = None,
         command: str = None,
         detach: bool = True,
         network_id: str = None,
         volumes: dict[str, VolumeConfig] = None,
         ports: dict[str, int | list[int]] = None,
+        tty: bool = False,
+        stdin_open: bool = False,
         environment: dict[str, str] = None,
         **kwargs
     ) -> dict[str, Any]:
@@ -80,6 +83,8 @@ class AsyncDockerController:
                 network=network_id,
                 volumes=volumes_dict,
                 ports=ports,
+                tty=tty,
+                stdin_open=stdin_open,
                 environment=environment,
                 **kwargs
             )

@@ -1,30 +1,21 @@
-from pydantic import BaseModel
-from uuid import UUID
-from app.schemas.common import UserRoleRead
+from dataclasses import dataclass
+
+from advanced_alchemy.extensions.litestar import SQLAlchemyDTO
+from litestar.dto import DTOConfig
+
+from app.enums import MiniverseType
+from app.models import Miniverse
 
 
-class MiniverseBase(BaseModel):
+class MiniverseRead(SQLAlchemyDTO[Miniverse]):
+    config = DTOConfig(exclude={"users_roles", "proxy"})
+
+
+@dataclass
+class MiniverseCreate:
     name: str
-    type: str
-    description: str | None = None
-    container_id: str | None = None
+    type: MiniverseType
+    description: str | None
     mc_version: str
-    subdomain: str
-
-class MiniverseCreate(MiniverseBase):
-    proxy_id: UUID | None = None
-
-class MiniverseUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    mc_version: str | None = None
-    subdomain: str | None = None
-    proxy_id: UUID | None = None
-
-class MiniverseRead(MiniverseBase):
-    id: UUID
-    proxy_id: UUID | None
-    user_roles: list["UserRoleRead"] = []
-
-    class Config:
-        from_attributes = True
+    subdomain: str | None
+    proxy_id: str | None

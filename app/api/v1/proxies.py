@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.models import Proxy
-from app.schemas import ProxyRead, ProxyCreate
+from app.schemas import ProxyCreate
 from app.services.proxy_service import create_proxy, get_proxies
 
 
@@ -12,7 +12,6 @@ class ProxiesController(Controller):
     path = "/proxies"
     tags = ["Proxies"]
     dependencies = {"db": Provide(get_db_session)}
-    return_dto = ProxyRead
 
     @get("/")
     async def list_proxies(self, db: AsyncSession) -> list[Proxy]:

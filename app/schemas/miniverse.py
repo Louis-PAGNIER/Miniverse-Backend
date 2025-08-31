@@ -1,14 +1,5 @@
 from dataclasses import dataclass
-
-from advanced_alchemy.extensions.litestar import SQLAlchemyDTO
-from litestar.dto import DTOConfig
-
 from app.enums import MiniverseType
-from app.models import Miniverse
-
-
-class MiniverseRead(SQLAlchemyDTO[Miniverse]):
-    config = DTOConfig(exclude={"users_roles", "proxy"})
 
 
 @dataclass

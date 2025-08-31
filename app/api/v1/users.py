@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.models import User
-from app.schemas import UserRead, UserCreate
+from app.schemas import UserCreate
 from app.services.user_service import create_user, get_users
 
 
@@ -15,7 +15,6 @@ class UsersController(Controller):
     path = "/users"
     tags = ["Users"]
     dependencies = {"db": Provide(get_db_session)}
-    return_dto = UserRead
 
     @get("/")
     async def list_users(self, request: Request[User, Token, Any], db: AsyncSession) -> list[User]:

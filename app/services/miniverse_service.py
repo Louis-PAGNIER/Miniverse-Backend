@@ -14,6 +14,9 @@ import shutil
 
 MINIVERSES_VOLUME_PATH = Path(settings.DATA_PATH) / "miniverses"
 
+def get_miniverse_volume_path(miniverse_id: str) -> Path:
+    return MINIVERSES_VOLUME_PATH / miniverse_id
+
 async def get_miniverses(db: AsyncSession) -> list[Miniverse]:
     result = await db.execute(select(Miniverse))
     return list(result.scalars().all())

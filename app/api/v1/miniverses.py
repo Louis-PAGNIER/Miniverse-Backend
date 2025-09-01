@@ -7,7 +7,7 @@ from app.db.session import get_db_session
 from app.models import Miniverse, Mod
 from app.schemas import MiniverseCreate
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse
-from app.services.mods_service import install_mod
+from app.services.mods_service import install_mod, uninstall_mod
 
 
 class MiniversesController(Controller):
@@ -38,3 +38,16 @@ class MiniversesController(Controller):
             raise NotFoundException("Miniverse not found")
 
         return await install_mod(mod_version_id, miniverse, db)
+
+    @delete("/{mod_id:str}")
+    async def uninstall_mod(self, mod_id: str, db: AsyncSession) -> None:
+        mod = await db.get(Mod, mod_id)
+        if not mod:
+            raise NotFoundException("Mod not found in this miniverse")
+
+        miniverse = await db.get(Miniverse, mod.miniverse_id)
+        if not miniverse:
+            raise NotFoundException("Miniverse not found")
+
+        await uninstall_mod(mod, miniverse, db)
+        return None

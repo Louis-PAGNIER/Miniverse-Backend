@@ -114,3 +114,13 @@ async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSessio
             f.write(download_response.content)
 
         return mod
+
+
+async def uninstall_mod(mod: Mod, miniverse: Miniverse, db: AsyncSession) -> None:
+    mods_path = get_miniverse_volume_path(miniverse.id) / "data" / "mods"
+    mod_file_path = mods_path / mod.file_name
+    if mod_file_path.exists() and mod_file_path.is_file():
+        mod_file_path.unlink()
+
+    await db.delete(mod)
+    await db.commit()

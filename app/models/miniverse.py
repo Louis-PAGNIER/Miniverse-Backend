@@ -20,7 +20,7 @@ class Miniverse(Base):
     mc_version: Mapped[str] = mapped_column(String)
     subdomain: Mapped[str] = mapped_column(String)
 
-    proxy_id: Mapped[str | None] = mapped_column(String, ForeignKey("proxies.id"))
+    proxy_id: Mapped[str | None] = mapped_column(String, ForeignKey("proxies.id", ondelete="SET NULL"))
     proxy = relationship("Proxy", back_populates="miniverses", lazy="selectin", info=dto_field("private"))
 
     users_roles = relationship("MiniverseUserRole", back_populates="miniverse", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))

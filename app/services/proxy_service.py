@@ -20,6 +20,9 @@ async def get_proxies(db: AsyncSession) -> list[Proxy]:
     result = await db.execute(select(Proxy))
     return list(result.scalars().all())
 
+async def get_proxy(proxy_id: str, db: AsyncSession) -> Proxy | None:
+    result = await db.execute(select(Proxy).where(Proxy.id == proxy_id))
+    return result.scalars().first()
 
 async def create_proxy(proxy: ProxyCreate, db: AsyncSession) -> Proxy:
     db_proxy = Proxy(
@@ -38,6 +41,21 @@ async def create_proxy(proxy: ProxyCreate, db: AsyncSession) -> Proxy:
     await dockerctl.start_container(container["Id"])
 
     return db_proxy
+
+
+async def delete_proxy(proxy: Proxy, db: AsyncSession):
+    if proxy.container_id:
+        # remove_container also stops the container if it's running using force=True (SIGKILL)
+        logger.info(f"Deleting proxy {proxy.name} (ID: {proxy.id})")
+        await dockerctl.remove_container(proxy.container_id)
+
+    volume_base_path = PROXIES_VOLUME_PATH / proxy.id
+    if volume_base_path.exists() and volume_base_path.is_dir():
+        import shutil
+        shutil.rmtree(volume_base_path)
+
+    await db.delete(proxy)
+    await db.commit()
 
 
 async def update_proxy_config(proxy: Proxy, db: AsyncSession, restart: bool = True):

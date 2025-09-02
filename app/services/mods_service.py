@@ -73,6 +73,10 @@ async def get_version_details(version_id: str) -> ModrinthProjectVersion:
         return ModrinthProjectVersion.from_dict(data)
 
 
+async def get_mod(mod_id: str, db: AsyncSession) -> Mod | None:
+    return await db.get(Mod, mod_id)
+
+
 async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSession) -> Mod:
     async with httpx.AsyncClient() as client:
         version = await get_version_details(mod_version_id)

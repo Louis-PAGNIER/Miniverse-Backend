@@ -1,53 +1,62 @@
 from litestar import get, post, Controller, delete
 from litestar.di import Provide
-from litestar.exceptions import NotFoundException
+from litestar.exceptions import NotFoundException, NotAuthorizedException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
-from app.models import Miniverse, Mod
+from app.enums import Role
+from app.models import Miniverse, Mod, User
 from app.schemas import MiniverseCreate
+from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse
-from app.services.mods_service import install_mod, uninstall_mod
+from app.services.mods_service import install_mod, uninstall_mod, get_mod
 
 
 class MiniversesController(Controller):
     path = "/miniverses"
     tags = ["Miniverses"]
-    dependencies = {"db": Provide(get_db_session)}
+    dependencies = {
+        "db": Provide(get_db_session),
+        "current_user": Provide(get_current_user),
+    }
 
     @get("/")
     async def list_miniverses(self, db: AsyncSession) -> list[Miniverse]:
         return await get_miniverses(db)
 
     @post("/")
-    async def create_miniverse(self, data: MiniverseCreate, db: AsyncSession) -> Miniverse:
+    async def create_miniverse(self, current_user: User, data: MiniverseCreate, db: AsyncSession) -> Miniverse:
+        if current_user.get_proxy_role(data.proxy_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to create miniverse for this proxy")
+
         return await create_miniverse(data, db)
 
     @delete("/{miniverse_id:str}")
-    async def delete_miniverse(self, miniverse_id: str, db: AsyncSession) -> None:
+    async def delete_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
+            raise NotAuthorizedException("You are not authorized to delete this miniverse")
+
         miniverse = await get_miniverse(miniverse_id, db)
-        if not miniverse:
-            raise NotFoundException("Miniverse not found")
         await delete_miniverse(miniverse, db)
         return None
 
     @post("/{miniverse_id:str}/install/mod/{mod_version_id:str}")
-    async def install_mod(self, miniverse_id: str, mod_version_id: str, db: AsyncSession) -> Mod:
-        miniverse = await get_miniverse(miniverse_id, db)
-        if not miniverse:
-            raise NotFoundException("Miniverse not found")
+    async def install_mod(self, current_user: User, miniverse_id: str, mod_version_id: str, db: AsyncSession) -> Mod:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to install mods in this miniverse")
 
+        miniverse = await get_miniverse(miniverse_id, db)
         return await install_mod(mod_version_id, miniverse, db)
 
-    @delete("/{mod_id:str}")
-    async def uninstall_mod(self, mod_id: str, db: AsyncSession) -> None:
-        mod = await db.get(Mod, mod_id)
-        if not mod:
+    @delete("/mods/{mod_id:str}")
+    async def uninstall_mod(self, current_user: User, mod_id: str, db: AsyncSession) -> None:
+        if mod := get_mod(mod_id, db) is None:
             raise NotFoundException("Mod not found in this miniverse")
 
-        miniverse = await db.get(Miniverse, mod.miniverse_id)
-        if not miniverse:
-            raise NotFoundException("Miniverse not found")
+        if current_user.get_miniverse_role(mod.miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to uninstall mods in this miniverse")
+
+        miniverse = await get_miniverse(mod.miniverse_id, db)
 
         await uninstall_mod(mod, miniverse, db)
         return None

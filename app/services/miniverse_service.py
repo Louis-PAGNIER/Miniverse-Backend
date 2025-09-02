@@ -33,12 +33,11 @@ async def create_miniverse(miniverse: MiniverseCreate, db: AsyncSession) -> Mini
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
         proxy_id=miniverse.proxy_id,
-        # TODO: Check if the user has permission to use the selected proxy
     )
     db.add(db_miniverse)
     await db.commit()
     await db.refresh(db_miniverse)
-    container = await create_miniverse_container(db_miniverse, db)
+    container = await create_miniverse_container(db_miniverse)
     db_miniverse.container_id = container["Id"]
     await db.commit()
     await db.refresh(db_miniverse)
@@ -63,7 +62,7 @@ async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
     await update_proxy_config(proxy, db, restart=True)
 
 
-async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> dict:
+async def create_miniverse_container(miniverse: Miniverse) -> dict:
     logger.info(f"Creating miniverse container for miniverse {miniverse.name}")
     container_name = "miniverse-" + miniverse.id
 

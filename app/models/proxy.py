@@ -20,14 +20,3 @@ class Proxy(Base):
 
     miniverses = relationship("Miniverse", back_populates="proxy", lazy="selectin", info=dto_field("private"), passive_deletes=True)
     users_roles = relationship("ProxyUserRole", back_populates="proxy", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))
-
-
-class ProxyUserRole(Base):
-    __tablename__ = "proxy_user_roles"
-
-    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), primary_key=True)
-    proxy_id: Mapped[str] = mapped_column(String, ForeignKey("proxies.id"), primary_key=True)
-    role: Mapped[Role] = mapped_column(Enum(Role))
-
-    user = relationship("User", back_populates="proxies_roles", info=dto_field("private"))
-    proxy = relationship("Proxy", back_populates="users_roles", info=dto_field("private"))

@@ -7,6 +7,7 @@ from litestar.params import Parameter
 from app.db.session import get_db_session
 from app.schemas import ModrinthSearchResults, ModrinthSearchFacets, ModrinthProjectType, ModrinthProjectVersion, \
     ModrinthProject
+from app.services.auth_service import get_current_user
 from app.services.mods_service import search_modrinth_projects, get_project_details, list_project_versions, \
     get_version_details
 
@@ -14,7 +15,10 @@ from app.services.mods_service import search_modrinth_projects, get_project_deta
 class ModsController(Controller):
     path = "/mods"
     tags = ["Mods"]
-    dependencies = {"db": Provide(get_db_session)}
+    dependencies = {
+        "db": Provide(get_db_session),
+        "current_user": Provide(get_current_user),
+    }
 
     @get("/search")
     async def search_mods(self, query_search: Annotated[str, Parameter(query="query")], limit: int = 20, offset: int = 0) -> ModrinthSearchResults:

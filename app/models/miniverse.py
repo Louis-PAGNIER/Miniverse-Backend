@@ -26,14 +26,3 @@ class Miniverse(Base):
     users_roles = relationship("MiniverseUserRole", back_populates="miniverse", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))
 
     mods: Mapped[list[Mod]] = relationship("Mod", back_populates="miniverse", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))
-
-
-class MiniverseUserRole(Base):
-    __tablename__ = "miniverse_user_roles"
-
-    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), primary_key=True)
-    miniverse_id: Mapped[str] = mapped_column(String, ForeignKey("miniverses.id"), primary_key=True)
-    role: Mapped[Role] = mapped_column(Enum(Role))
-
-    user = relationship("User", back_populates="miniverses_roles", info=dto_field("private"))
-    miniverse = relationship("Miniverse", back_populates="users_roles", info=dto_field("private"))

@@ -1,111 +1,126 @@
-from uuid import uuid4
-
-import toml
-
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models import Miniverse
+from app.core.config import settings
 
-from app import logger
-from app.core import settings
-from app.models import Proxy
-from app.schemas.proxy import ProxyCreate
-from app.services.configs_generator import generate_velocity_config
+import yaml
+
 from app.services.docker_service import dockerctl, VolumeConfig
 
-PROXIES_VOLUME_PATH = Path(settings.DATA_PATH) / "proxies"
 
-async def get_proxies(db: AsyncSession) -> list[Proxy]:
-    result = await db.execute(select(Proxy))
-    return list(result.scalars().all())
-
-async def get_proxy(proxy_id: str, db: AsyncSession) -> Proxy | None:
-    result = await db.execute(select(Proxy).where(Proxy.id == proxy_id))
-    return result.scalars().first()
-
-async def create_proxy(proxy: ProxyCreate, db: AsyncSession) -> Proxy:
-    db_proxy = Proxy(
-        name=proxy.name,
-        type=proxy.type,
-        port=proxy.port,
-        description=proxy.description,
-    )
-    db.add(db_proxy)
-    await db.commit()
-    await db.refresh(db_proxy)
-    container = await create_proxy_container(db_proxy, db)
-    db_proxy.container_id = container["Id"]
-    await db.commit()
-    await db.refresh(db_proxy)
-    await dockerctl.start_container(container["Id"])
-
-    return db_proxy
-
-
-async def delete_proxy(proxy: Proxy, db: AsyncSession):
-    if proxy.container_id:
-        # remove_container also stops the container if it's running using force=True (SIGKILL)
-        logger.info(f"Deleting proxy {proxy.name} (ID: {proxy.id})")
-        await dockerctl.remove_container(proxy.container_id)
-
-    volume_base_path = PROXIES_VOLUME_PATH / proxy.id
-    if volume_base_path.exists() and volume_base_path.is_dir():
-        import shutil
-        shutil.rmtree(volume_base_path)
-
-    await db.delete(proxy)
-    await db.commit()
-
-
-async def update_proxy_config(proxy: Proxy, db: AsyncSession, restart: bool = True):
-    volume_config_path = PROXIES_VOLUME_PATH / proxy.id / "config" / "velocity.toml"
-    config = await generate_velocity_config(proxy, db)
-    with open(volume_config_path, "w") as f:
-        toml.dump(config, f)
-    if restart:
-        await dockerctl.restart_container(proxy.container_id)
-
-
-async def create_proxy_container(proxy: Proxy, db: AsyncSession) -> dict:
-    logger.info(f"Creating proxy container for proxy {proxy.name} on port {proxy.port}")
-    container_name = "miniverse-proxy-" + proxy.id
-
-    volume_base_path = PROXIES_VOLUME_PATH / proxy.id
-    volume_base_path.mkdir(parents=True)
-
-    volume_config_path = volume_base_path / "config"
-    volume_config_path.mkdir()
-
-    volume_server_path = volume_base_path / "server"
-    volume_server_path.mkdir()
-
-    volume_plugins_path = volume_base_path / "plugins"
-    volume_plugins_path.mkdir()
-
-    forwarding_secret_path = volume_config_path / "forwarding.secret"
-    with open(forwarding_secret_path, "w") as f:
-        f.write(str(uuid4()))
-
-    await update_proxy_config(proxy, db, restart=False)
-
-    container = await dockerctl.create_container(
-        image="itzg/mc-proxy",
-        name=container_name,
-        network_id=settings.DOCKER_NETWORK_NAME,
-        volumes={
-            #TODO: Replace paths to fixed paths like in /var/lib/miniverse/...
-            str(volume_config_path.resolve()): VolumeConfig(bind="/config", mode="ro"),
-            str(volume_server_path.resolve()): VolumeConfig(bind="/server"),
-            str(volume_plugins_path.resolve()): VolumeConfig(bind="/plugins"),
-        },
-        ports={'25565/tcp': proxy.port},
-        environment={
-            "TYPE": proxy.type.value.upper(),
-            "DEBUG": "false",
-            "ENABLE_RCON": "true",
+def generate_main_proxy_config(miniverse_list: list[Miniverse]) -> dict:
+    return {
+        "config": {
+            "bind": "0.0.0.0:25565",
+            "lite": {
+                "enabled": True,
+                "routes": [
+                    {
+                        "host": f"{miniverse.subdomain}.miniverse.fr",
+                        "backend": f"miniverse-{miniverse.id}:25565",
+                        "cachePingTTL": "-1s",
+                        "fallback": {
+                            "motd": f"§c{miniverse.name} server is offline",
+                            "version": {
+                                "name": "§cTry again later!",
+                                "protocol": -1
+                            }
+                        }
+                    }
+                for miniverse in miniverse_list] + [
+                    {
+                        "host": "*",
+                        "backend": "miniverse-gate-classic:25565",
+                        "cachePingTTL": "-1s",
+                        "fallback": {
+                            "motd": "§cThe Gate classic proxy is offline",
+                            "version": {
+                                "name": "§cContact an administrator",
+                                "protocol": -1
+                            }
+                        }
+                    }
+                ]
+            }
         }
-    )
+    }
 
-    return container
+
+def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
+    return {
+        "config": {
+            "bind": "0.0.0.0:25565",
+            "onlineMode": False,
+            "servers": {
+                miniverse.id: f"miniverse-{miniverse.id}:25565" for miniverse in miniverse_list
+            },
+            "try": [miniverse.id for miniverse in miniverse_list],
+            "status": {
+                "motd": "§bA Miniverse Server",
+                "showMaxPlayers": 1000,
+            },
+            "acceptTransfers": True,
+        },
+        "api": {
+            "enabled": True,
+            "bind": "0.0.0.0:8080"
+        }
+    }
+
+
+async def update_proxy_config(db: AsyncSession) -> None:
+    miniverses = await db.execute(select(Miniverse))
+    miniverse_list = list(miniverses.scalars().all())
+    data_path = Path(settings.DATA_PATH)
+
+    main_proxy_config = generate_main_proxy_config([miniverse for miniverse in miniverse_list if miniverse.is_on_main_proxy])
+    main_proxy_config_path = data_path / "proxy" / "configs" / "config-main.yml"
+
+    classic_proxy_config = generate_classic_proxy_config([miniverse for miniverse in miniverse_list if not miniverse.is_on_main_proxy])
+    classic_proxy_config_path = data_path / "proxy" / "configs" /"config-classic.yml"
+
+    main_proxy_config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with main_proxy_config_path.open("w") as f:
+        yaml.dump(main_proxy_config, f)
+    with classic_proxy_config_path.open("w") as f:
+        yaml.dump(classic_proxy_config, f)
+
+
+async def start_proxy_containers() -> None:
+    data_path = Path(settings.DATA_PATH)
+    main_proxy_config_path = data_path / "proxy" / "configs" /"config-main.yml"
+    classic_proxy_config_path = data_path / "proxy" / "configs" /"config-classic.yml"
+
+    main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
+    if main_container is None:
+        main_container = await dockerctl.create_container(
+            image="ghcr.io/minekube/gate:latest",
+            name="miniverse-gate-main",
+            network_id=settings.DOCKER_NETWORK_NAME,
+            volumes={str(main_proxy_config_path.parent.resolve()): VolumeConfig(bind="/configs")},
+            ports={"25565/tcp": 25565},
+            entrypoint="/gate",
+            command=["--config", "/configs/config-main.yml"],
+        )
+        await dockerctl.start_container(main_container["Id"])
+    else:
+        await dockerctl.restart_container(main_container["Id"])
+
+    classic_container = await dockerctl.get_container_by_name("miniverse-gate-classic")
+    if classic_container is None:
+        classic_container = await dockerctl.create_container(
+            image="ghcr.io/minekube/gate:latest",
+            name="miniverse-gate-classic",
+            network_id=settings.DOCKER_NETWORK_NAME,
+            volumes={str(classic_proxy_config_path.parent.resolve()): VolumeConfig(bind="/configs")},
+            ports={"8080/tcp": 8080},
+            entrypoint="/gate",
+            command=["--config", "/configs/config-classic.yml"]
+        )
+        await dockerctl.start_container(classic_container["Id"])
+    else:
+        await dockerctl.restart_container(classic_container["Id"])
 

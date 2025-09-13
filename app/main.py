@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 
 from app.db.session import session_config
+from app.services.proxy_service import start_proxy_containers, update_proxy_config
 
 load_dotenv()
 
@@ -14,14 +15,18 @@ from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 
 from app.db import Base
 from app.api.v1 import oauth2_auth, login
-from app.api.v1 import UsersController, ProxiesController, MiniversesController, ModsController
+from app.api.v1 import UsersController, MiniversesController, ModsController
 
 from app.services.docker_service import dockerctl
 
 import httpx
 
+async def proxy_startup():
+    async with session_config.get_session() as session:
+        await update_proxy_config(session)
 
-async def db_startup() -> None:
+
+async def db_startup():
     async with session_config.get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -31,6 +36,7 @@ async def db_startup() -> None:
 
 async def docker_startup():
     await dockerctl.initialize()
+    await start_proxy_containers()
 
 
 @asynccontextmanager
@@ -45,9 +51,9 @@ def get_http_client(request: Request) -> httpx.AsyncClient:
 
 
 app = Litestar(
-    route_handlers=[login, UsersController, ProxiesController, MiniversesController, ModsController],
+    route_handlers=[login, UsersController, MiniversesController, ModsController],
     lifespan=[httpx_client_lifespan],
-    on_startup=[docker_startup, db_startup],
+    on_startup=[proxy_startup, docker_startup, db_startup],
     on_app_init=[oauth2_auth.on_app_init],
     openapi_config=OpenAPIConfig(
         title="Miniverse API",

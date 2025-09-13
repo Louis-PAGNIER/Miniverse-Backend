@@ -26,8 +26,8 @@ class MiniversesController(Controller):
 
     @post("/")
     async def create_miniverse(self, current_user: User, data: MiniverseCreate, db: AsyncSession) -> Miniverse:
-        if current_user.get_proxy_role(data.proxy_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to create miniverse for this proxy")
+        if current_user.role < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to create miniverses")
 
         return await create_miniverse(data, db)
 

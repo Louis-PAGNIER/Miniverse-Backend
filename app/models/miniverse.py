@@ -1,5 +1,5 @@
 from litestar.dto import dto_field
-from sqlalchemy import String, Text, Enum, ForeignKey
+from sqlalchemy import String, Text, Enum, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -19,10 +19,7 @@ class Miniverse(Base):
     container_id: Mapped[str | None] = mapped_column(String)
     mc_version: Mapped[str] = mapped_column(String)
     subdomain: Mapped[str] = mapped_column(String)
-
-    proxy_id: Mapped[str | None] = mapped_column(String, ForeignKey("proxies.id", ondelete="SET NULL"))
-    proxy = relationship("Proxy", back_populates="miniverses", lazy="selectin", info=dto_field("private"))
+    is_on_main_proxy: Mapped[bool] = mapped_column(Boolean)
 
     users_roles = relationship("MiniverseUserRole", back_populates="miniverse", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))
-
     mods: Mapped[list[Mod]] = relationship("Mod", back_populates="miniverse", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))

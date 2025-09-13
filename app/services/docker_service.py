@@ -112,6 +112,24 @@ class AsyncDockerController:
             lambda: self.client.containers.get(container_id).remove(force=True)
         )
 
+    async def get_container(self, container_id: str) -> dict[str, Any]:
+        def _get():
+            try:
+                container = self.client.containers.get(container_id)
+                return container.attrs
+            except docker.errors.NotFound:
+                return None
+        return await asyncio.to_thread(_get)
+
+    async def get_container_by_name(self, name: str) -> dict[str, Any] | None:
+        def _get():
+            containers = self.client.containers.list(all=True, filters={"name": name})
+            print(containers)
+            if containers:
+                return containers[0].attrs
+            return None
+        return await asyncio.to_thread(_get)
+
     async def initialize(self):
         networks = await self.networks.list_networks()
         if not any(n["Name"] == settings.DOCKER_NETWORK_NAME for n in networks):

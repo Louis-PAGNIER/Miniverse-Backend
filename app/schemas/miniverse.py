@@ -9,4 +9,3 @@ class MiniverseCreate:
     description: str | None
     mc_version: str
     subdomain: str | None
-    proxy_id: str | None

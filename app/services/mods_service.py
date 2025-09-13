@@ -1,4 +1,3 @@
-from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -6,9 +5,7 @@ from litestar.exceptions import ValidationException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Miniverse, Mod
-from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, ModrinthSearchResult, ModrinthProjectType, \
-    ModSideSupport, ModrinthProjectVersion, ModrinthProject
-from app.services.miniverse_service import get_miniverse_volume_path
+from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, ModrinthProjectVersion, ModrinthProject
 
 MODRINTH_BASE_URL = "https://api.modrinth.com/v2"
 
@@ -78,6 +75,7 @@ async def get_mod(mod_id: str, db: AsyncSession) -> Mod | None:
 
 
 async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSession) -> Mod:
+    from app.services.miniverse_service import get_miniverse_path
     async with httpx.AsyncClient() as client:
         version = await get_version_details(mod_version_id)
         project = await get_project_details(version.project_id)
@@ -108,7 +106,7 @@ async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSessio
         await db.commit()
         await db.refresh(mod)
 
-        mods_path = get_miniverse_volume_path(miniverse.id) / "data" / "mods"
+        mods_path = get_miniverse_path(miniverse.id,  "data", "mods")
         mods_path.mkdir(parents=True, exist_ok=True)
 
         download_response = await client.get(primary_file.url)
@@ -121,7 +119,8 @@ async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSessio
 
 
 async def uninstall_mod(mod: Mod, miniverse: Miniverse, db: AsyncSession) -> None:
-    mods_path = get_miniverse_volume_path(miniverse.id) / "data" / "mods"
+    from app.services.miniverse_service import get_miniverse_path
+    mods_path = get_miniverse_path(miniverse.id,  "data", "mods")
     mod_file_path = mods_path / mod.file_name
     if mod_file_path.exists() and mod_file_path.is_file():
         mod_file_path.unlink()

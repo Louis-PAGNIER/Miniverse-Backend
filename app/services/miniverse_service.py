@@ -5,17 +5,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.core import settings
+from app.enums import MiniverseType
 from app.models import Miniverse
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
-from app.services.proxy_service import update_proxy_config
+from app.services.mods_service import install_mod
 
 import shutil
 
-MINIVERSES_VOLUME_PATH = Path(settings.DATA_PATH) / "miniverses"
+from app.services.proxy_service import update_proxy_config
 
-def get_miniverse_volume_path(miniverse_id: str) -> Path:
-    return MINIVERSES_VOLUME_PATH / miniverse_id
+
+def get_miniverse_path(proxy_id: str, *subpaths: str) -> Path:
+    return Path(settings.DATA_PATH) / "miniverses" / proxy_id / Path(*subpaths)
 
 async def get_miniverses(db: AsyncSession) -> list[Miniverse]:
     result = await db.execute(select(Miniverse))
@@ -32,7 +34,7 @@ async def create_miniverse(miniverse: MiniverseCreate, db: AsyncSession) -> Mini
         description=miniverse.description,
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
-        proxy_id=miniverse.proxy_id,
+        is_on_main_proxy=False,
     )
     db.add(db_miniverse)
     await db.commit()
@@ -42,35 +44,33 @@ async def create_miniverse(miniverse: MiniverseCreate, db: AsyncSession) -> Mini
     await db.commit()
     await db.refresh(db_miniverse)
     await dockerctl.start_container(container["Id"])
-    await update_proxy_config(db_miniverse.proxy, db, restart=True)
+    await update_proxy_config(db)
 
     return db_miniverse
 
 
 async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
-    proxy = miniverse.proxy
     if miniverse.container_id:
         # remove_container also stops the container if it's running using force=True (SIGKILL)
         logger.info(f"Deleting miniverse {miniverse.name} (ID: {miniverse.id})")
         await dockerctl.remove_container(miniverse.container_id)
 
-    volume_base_path = MINIVERSES_VOLUME_PATH / miniverse.id
+    volume_base_path = get_miniverse_path(miniverse.id)
     if volume_base_path.exists() and volume_base_path.is_dir():
         shutil.rmtree(volume_base_path)
     await db.delete(miniverse)
     await db.commit()
-    await update_proxy_config(proxy, db, restart=True)
+    await update_proxy_config(db)
 
 
 async def create_miniverse_container(miniverse: Miniverse) -> dict:
     logger.info(f"Creating miniverse container for miniverse {miniverse.name}")
     container_name = "miniverse-" + miniverse.id
 
-    volume_base_path = MINIVERSES_VOLUME_PATH / miniverse.id
-    volume_base_path.mkdir(parents=True)
+    volume_data_path = get_miniverse_path(miniverse.id, "data")
+    volume_data_path.mkdir(parents=True, exist_ok=True)
 
-    volume_data_path = volume_base_path / "data"
-    volume_data_path.mkdir()
+    await init_data_path(miniverse)
 
     container = await dockerctl.create_container(
         image="itzg/minecraft-server",
@@ -83,7 +83,7 @@ async def create_miniverse_container(miniverse: Miniverse) -> dict:
             "TYPE": miniverse.type.value.upper(),
             "VERSION": miniverse.mc_version,
             "MOTD": f"Welcome to {miniverse.name}!",
-            "ONLINE_MODE": "false",
+            "ONLINE_MODE": "true",
             "SERVER_PORT": "25565",
         },
         tty=True,
@@ -91,3 +91,10 @@ async def create_miniverse_container(miniverse: Miniverse) -> dict:
     )
 
     return container
+
+
+async def init_data_path(miniverse: Miniverse):
+    volume_data_path = get_miniverse_path(miniverse.id, "data")
+    if miniverse.type == MiniverseType.FABRIC:
+        # Download Fabric API
+        logger.info(f"Downloading Fabric API for miniverse {miniverse.name}")

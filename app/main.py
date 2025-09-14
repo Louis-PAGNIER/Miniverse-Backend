@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 
+from app import logger
 from app.db.session import session_config
+from app.enums import Role
 from app.services.miniverse_service import get_miniverses
 from app.services.proxy_service import start_proxy_containers, update_proxy_config
 
@@ -21,6 +23,9 @@ from app.api.v1 import UsersController, MiniversesController, ModsController
 from app.services.docker_service import dockerctl
 from app.managers.ServerStatusManager import server_status_manager
 
+from app.schemas.user import UserCreate
+from app.services.user_service import get_user_by_username, create_user
+
 import httpx
 
 async def proxy_startup():
@@ -34,7 +39,12 @@ async def db_startup():
 
     async with session_config.get_session() as session:
         # Create initial admin user if not exists
-        ...
+        admin_username = "Louis"
+        admin_password = "1234"
+        admin_user = await get_user_by_username(admin_username, session)
+        if not admin_user:
+            await create_user(UserCreate(admin_username, admin_password, Role.ADMIN), session)
+
 
 async def docker_startup():
     await dockerctl.initialize()

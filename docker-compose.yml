@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  miniverse-api:
+    build: .
+    env_file:
+      - .env
+    container_name: miniverse-api
+    volumes:
+      - ${HOST_DATA_PATH}:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENV=production
+    ports:
+      - "8000:8000"
+    networks:
+      - miniverse-net
+      - redis-net
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    container_name: miniverse-redis
+    command: ["redis-server", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - redis-net
+    restart: unless-stopped
+
+networks:
+  miniverse-net:
+    external: true
+  redis-net:
+    external: false
+
+volumes:
+  redis-data:
+    driver: local

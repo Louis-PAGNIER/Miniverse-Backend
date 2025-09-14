@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Miniverse
-from app.core.config import settings
+from app.core.config import settings, DATA_PATH
 
 import yaml
 
@@ -73,13 +73,12 @@ def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
 async def update_proxy_config(db: AsyncSession) -> None:
     miniverses = await db.execute(select(Miniverse))
     miniverse_list = list(miniverses.scalars().all())
-    data_path = Path(settings.DATA_PATH)
 
     main_proxy_config = generate_main_proxy_config([miniverse for miniverse in miniverse_list if miniverse.is_on_main_proxy])
-    main_proxy_config_path = data_path / "proxy" / "configs" / "config-main.yml"
+    main_proxy_config_path = DATA_PATH / "proxy" / "configs" / "config-main.yml"
 
     classic_proxy_config = generate_classic_proxy_config([miniverse for miniverse in miniverse_list if not miniverse.is_on_main_proxy])
-    classic_proxy_config_path = data_path / "proxy" / "configs" /"config-classic.yml"
+    classic_proxy_config_path = DATA_PATH / "proxy" / "configs" /"config-classic.yml"
 
     main_proxy_config_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -90,9 +89,8 @@ async def update_proxy_config(db: AsyncSession) -> None:
 
 
 async def start_proxy_containers() -> None:
-    data_path = Path(settings.DATA_PATH)
-    main_proxy_config_path = data_path / "proxy" / "configs" /"config-main.yml"
-    classic_proxy_config_path = data_path / "proxy" / "configs" /"config-classic.yml"
+    main_proxy_config_path = Path(settings.HOST_DATA_PATH) / "proxy" / "configs" /"config-main.yml"
+    classic_proxy_config_path = Path(settings.HOST_DATA_PATH) / "proxy" / "configs" /"config-classic.yml"
 
     main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
     if main_container is None:
@@ -100,7 +98,7 @@ async def start_proxy_containers() -> None:
             image="ghcr.io/minekube/gate:latest",
             name="miniverse-gate-main",
             network_id=settings.DOCKER_NETWORK_NAME,
-            volumes={str(main_proxy_config_path.parent.resolve()): VolumeConfig(bind="/configs")},
+            volumes={str(main_proxy_config_path.parent): VolumeConfig(bind="/configs")},
             ports={"25565/tcp": 25565},
             entrypoint="/gate",
             command=["--config", "/configs/config-main.yml"],
@@ -115,7 +113,7 @@ async def start_proxy_containers() -> None:
             image="ghcr.io/minekube/gate:latest",
             name="miniverse-gate-classic",
             network_id=settings.DOCKER_NETWORK_NAME,
-            volumes={str(classic_proxy_config_path.parent.resolve()): VolumeConfig(bind="/configs")},
+            volumes={str(classic_proxy_config_path.parent): VolumeConfig(bind="/configs")},
             ports={"8080/tcp": 8080},
             entrypoint="/gate",
             command=["--config", "/configs/config-classic.yml"]

@@ -8,7 +8,7 @@ from app.services.auth_service import get_password_hash
 
 async def create_user(user: UserCreate, db: AsyncSession) -> User:
     logger.info(f"Creating user {user.username} with role {user.role}")
-    db_user = User(username=user.username, hashed_password=get_password_hash(user.password))
+    db_user = User(username=user.username, hashed_password=get_password_hash(user.password), role=user.role)
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)

@@ -5,20 +5,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.core import settings
+from app.core.config import DATA_PATH
 from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
+from app.managers import server_status_manager
 from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
-from app.services.mods_service import install_mod
 
 import shutil
 
 from app.services.proxy_service import update_proxy_config
 
 
-def get_miniverse_path(proxy_id: str, *subpaths: str) -> Path:
-    return Path(settings.DATA_PATH) / "miniverses" / proxy_id / Path(*subpaths)
+def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -> Path:
+    if from_host:
+        return Path(settings.HOST_DATA_PATH) / "miniverses" / proxy_id / Path(*subpaths)
+    return DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
 
 async def get_miniverses(db: AsyncSession) -> list[Miniverse]:
     result = await db.execute(select(Miniverse))
@@ -36,6 +39,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
         is_on_main_proxy=miniverse.is_on_main_proxy,
+        management_server_secret=generate_random_string(40),
     )
     db.add(db_miniverse)
     await db.commit()
@@ -59,10 +63,13 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
     await dockerctl.start_container(container["Id"])
     await update_proxy_config(db)
 
+    server_status_manager.add_miniverse(db_miniverse)
+
     return db_miniverse
 
 
 async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
+    server_status_manager.remove_miniverse(miniverse.id)
     if miniverse.container_id:
         # remove_container also stops the container if it's running using force=True (SIGKILL)
         logger.info(f"Deleting miniverse {miniverse.name} (ID: {miniverse.id})")
@@ -85,23 +92,26 @@ async def create_miniverse_container(miniverse: Miniverse) -> dict:
 
     await init_data_path(miniverse)
 
+    host_volume_data_path = get_miniverse_path(miniverse.id, "data", from_host=True)
+
     container = await dockerctl.create_container(
         image="itzg/minecraft-server",
         name=container_name,
         network_id=settings.DOCKER_NETWORK_NAME,
-        volumes={str(volume_data_path.resolve()): VolumeConfig(bind="/data")},
+        volumes={str(host_volume_data_path): VolumeConfig(bind="/data")},
         ports={"25585": 25585},
         environment={
             "EULA": "TRUE",
             "TYPE": miniverse.type.value.upper(),
             "VERSION": miniverse.mc_version,
             "MOTD": f"Welcome to {miniverse.name}!",
-            "ONLINE_MODE": "true",
+            "ONLINE_MODE": "TRUE",
             "SERVER_PORT": "25565",
             "MANAGEMENT_SERVER_ENABLED": "TRUE",
+            "MANAGEMENT_SERVER_TLS_ENABLED": "FALSE",
             "MANAGEMENT_SERVER_HOST": "0.0.0.0",
             "MANAGEMENT_SERVER_PORT": "25585",
-            "MANAGEMENT_SERVER_SECRET": generate_random_string(40),
+            "MANAGEMENT_SERVER_SECRET": miniverse.management_server_secret,
         },
         tty=True,
         stdin_open=True,

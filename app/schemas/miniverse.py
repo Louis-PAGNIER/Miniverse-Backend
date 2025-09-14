@@ -9,3 +9,4 @@ class MiniverseCreate:
     description: str | None
     mc_version: str
     subdomain: str | None
+    is_on_main_proxy: bool

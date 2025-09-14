@@ -5,8 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.core import settings
-from app.enums import MiniverseType
-from app.models import Miniverse
+from app.core.utils import generate_random_string
+from app.enums import MiniverseType, Role
+from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
 from app.services.mods_service import install_mod
@@ -27,22 +28,34 @@ async def get_miniverse(miniverse_id: str, db: AsyncSession) -> Miniverse | None
     result = await db.execute(select(Miniverse).where(Miniverse.id == miniverse_id))
     return result.scalars().first()
 
-async def create_miniverse(miniverse: MiniverseCreate, db: AsyncSession) -> Miniverse:
+async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncSession) -> Miniverse:
     db_miniverse = Miniverse(
         name=miniverse.name,
         type=miniverse.type,
         description=miniverse.description,
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
-        is_on_main_proxy=False,
+        is_on_main_proxy=miniverse.is_on_main_proxy,
     )
     db.add(db_miniverse)
     await db.commit()
     await db.refresh(db_miniverse)
+
+    # Assign the creator as ADMIN of the miniverse
+    user_role = MiniverseUserRole(
+        user_id=creator.id,
+        miniverse_id=db_miniverse.id,
+        role=Role.ADMIN,
+    )
+    db.add(user_role)
+    await db.commit()
+    await db.refresh(user_role)
+
     container = await create_miniverse_container(db_miniverse)
     db_miniverse.container_id = container["Id"]
     await db.commit()
     await db.refresh(db_miniverse)
+
     await dockerctl.start_container(container["Id"])
     await update_proxy_config(db)
 
@@ -77,7 +90,7 @@ async def create_miniverse_container(miniverse: Miniverse) -> dict:
         name=container_name,
         network_id=settings.DOCKER_NETWORK_NAME,
         volumes={str(volume_data_path.resolve()): VolumeConfig(bind="/data")},
-        ports={"25565/tcp": None},
+        ports={"25585": 25585},
         environment={
             "EULA": "TRUE",
             "TYPE": miniverse.type.value.upper(),
@@ -85,6 +98,10 @@ async def create_miniverse_container(miniverse: Miniverse) -> dict:
             "MOTD": f"Welcome to {miniverse.name}!",
             "ONLINE_MODE": "true",
             "SERVER_PORT": "25565",
+            "MANAGEMENT_SERVER_ENABLED": "TRUE",
+            "MANAGEMENT_SERVER_HOST": "0.0.0.0",
+            "MANAGEMENT_SERVER_PORT": "25585",
+            "MANAGEMENT_SERVER_SECRET": generate_random_string(40),
         },
         tty=True,
         stdin_open=True,

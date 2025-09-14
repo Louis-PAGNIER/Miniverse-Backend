@@ -20,6 +20,7 @@ class Miniverse(Base):
     mc_version: Mapped[str] = mapped_column(String)
     subdomain: Mapped[str] = mapped_column(String)
     is_on_main_proxy: Mapped[bool] = mapped_column(Boolean)
+    management_server_secret: Mapped[str | None] = mapped_column(String(length=40), info=dto_field("private"))
 
     users_roles = relationship("MiniverseUserRole", back_populates="miniverse", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))
     mods: Mapped[list[Mod]] = relationship("Mod", back_populates="miniverse", cascade="all, delete-orphan", lazy="selectin", info=dto_field("read-only"))

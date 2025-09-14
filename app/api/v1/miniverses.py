@@ -29,7 +29,7 @@ class MiniversesController(Controller):
         if current_user.role < Role.MODERATOR:
             raise NotAuthorizedException("You are not authorized to create miniverses")
 
-        return await create_miniverse(data, db)
+        return await create_miniverse(data, current_user, db)
 
     @delete("/{miniverse_id:str}")
     async def delete_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> None:

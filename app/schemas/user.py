@@ -9,3 +9,9 @@ class UserCreate:
     password: str
     role: Role = Role.USER
 UserCreateDTO = DataclassDTO[UserCreate]
+
+@dataclass
+class UserLogin:
+    username: str
+    password: str
+UserLoginDTO = DataclassDTO[UserLogin]

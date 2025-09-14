@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 
 from app import logger
+from app.api.v1.websockets import websocket_miniverse_updates_handler
 from app.db.session import session_config
 from app.enums import Role
 from app.services.miniverse_service import get_miniverses
@@ -22,6 +23,7 @@ from app.api.v1 import UsersController, MiniversesController, ModsController
 
 from app.services.docker_service import dockerctl
 from app.managers.ServerStatusManager import server_status_manager
+from app.core.channels import channels_plugin
 
 from app.schemas.user import UserCreate
 from app.services.user_service import get_user_by_username, create_user
@@ -70,7 +72,7 @@ def get_http_client(request: Request) -> httpx.AsyncClient:
 
 
 app = Litestar(
-    route_handlers=[login, UsersController, MiniversesController, ModsController],
+    route_handlers=[login, UsersController, MiniversesController, ModsController, websocket_miniverse_updates_handler],
     lifespan=[httpx_client_lifespan],
     on_startup=[docker_startup, db_startup, proxy_startup, server_status_manager_startup],
     on_app_init=[oauth2_auth.on_app_init],
@@ -92,6 +94,6 @@ app = Litestar(
         ],
         path="/docs"
     ),
-    plugins=[SQLAlchemyPlugin(config=session_config)],
+    plugins=[SQLAlchemyPlugin(config=session_config), channels_plugin],
 )
 

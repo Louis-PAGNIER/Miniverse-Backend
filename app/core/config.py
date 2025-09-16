@@ -3,6 +3,7 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     JWT_SECRET: str
+    PROXY_SECRET: str
     HOST_DATA_PATH: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     DOCKER_NETWORK_NAME: str = "miniverse-net"

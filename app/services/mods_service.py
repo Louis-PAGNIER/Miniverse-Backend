@@ -4,10 +4,17 @@ import httpx
 from litestar.exceptions import ValidationException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.enums import MiniverseType
 from app.models import Miniverse, Mod
+from app.schemas import ModVersionType
 from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, ModrinthProjectVersion, ModrinthProject
 
 MODRINTH_BASE_URL = "https://api.modrinth.com/v2"
+
+def dumps_values(values: list[str] | str) -> str:
+    if isinstance(values, str):
+        values = [values]
+    return str(values).replace("'", "").replace("\\", "")
 
 def build_or_facets(key: str, values: list[str] | str) -> str:
     if isinstance(values, str):
@@ -29,7 +36,7 @@ def build_facets(facets: ModrinthSearchFacets) -> str:
         res.append(build_or_facets("client_side", facets.client_side.value))
     if facets.server_side is not None:
         res.append(build_or_facets("server_side", facets.server_side.value))
-    return str(res).replace("'", "").replace("\\", "")
+    return dumps_values(res)
 
 
 async def search_modrinth_projects(query: str, facets: ModrinthSearchFacets, limit: int, offset: int = 0) -> ModrinthSearchResults:
@@ -46,9 +53,13 @@ async def search_modrinth_projects(query: str, facets: ModrinthSearchFacets, lim
         return ModrinthSearchResults.from_dict(data)
 
 
-async def list_project_versions(project_id: str) -> list[ModrinthProjectVersion]:
+async def list_project_versions(project_id: str, loader: MiniverseType = None, mc_version: str = None) -> list[ModrinthProjectVersion]:
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{MODRINTH_BASE_URL}/project/{project_id}/version")
+        response = await client.get(f"{MODRINTH_BASE_URL}/project/{project_id}/version",
+                                    params={
+                                      "loaders": dumps_values(loader.value) if loader else None,
+                                      "game_versions": dumps_values(mc_version) if mc_version else None
+                                    })
         response.raise_for_status()
         data = response.json()
         return [ModrinthProjectVersion.from_dict(v) for v in data]
@@ -116,6 +127,18 @@ async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSessio
             f.write(download_response.content)
 
         return mod
+
+
+async def install_mod_for_miniverse(mod_id: str, game_version: str | None, miniverse: Miniverse, db: AsyncSession, prioritize_release: bool = True) -> Mod:
+    if game_version is None:
+        game_version = miniverse.mc_version
+    versions = await list_project_versions(mod_id, loader=miniverse.type, mc_version=game_version)
+    if not versions:
+        raise ValidationException(f"No compatible versions found for mod {mod_id} with loader {miniverse.type} and game version {game_version}")
+    if prioritize_release:
+        versions = [v for v in versions if v.version_type == ModVersionType.RELEASE] or versions
+    latest_version = sorted(versions, key=lambda v: v.date_published, reverse=True)[0]
+    return await install_mod(latest_version.id, miniverse, db)
 
 
 async def uninstall_mod(mod: Mod, miniverse: Miniverse, db: AsyncSession) -> None:

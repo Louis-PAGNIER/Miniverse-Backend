@@ -52,11 +52,18 @@ def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
     return {
         "config": {
             "bind": "0.0.0.0:25565",
-            "onlineMode": False,
+            "onlineMode": True,
             "servers": {
                 miniverse.id: f"miniverse-{miniverse.id}:25565" for miniverse in miniverse_list
             },
             "try": [miniverse.id for miniverse in miniverse_list],
+            "forcedHost": {
+                f"{miniverse.subdomain}.miniverse.fr": miniverse.id for miniverse in miniverse_list
+            },
+            "forwarding": {
+                "mode": "velocity",
+                "velocitySecret": settings.PROXY_SECRET,
+            },
             "status": {
                 "motd": "§bA Miniverse Server",
                 "showMaxPlayers": 1000,

@@ -2,9 +2,11 @@ from typing import Annotated
 
 from litestar import get, Controller
 from litestar.di import Provide
+from litestar.exceptions import ValidationException
 from litestar.params import Parameter
 
 from app.db.session import get_db_session
+from app.enums import MiniverseType
 from app.schemas import ModrinthSearchResults, ModrinthSearchFacets, ModrinthProjectType, ModrinthProjectVersion, \
     ModrinthProject
 from app.services.auth_service import get_current_user
@@ -40,5 +42,9 @@ class ModsController(Controller):
         return await get_version_details(version_id)
 
     @get("{project_id:str}/versions")
-    async def list_mod_versions(self, project_id: str) -> list[ModrinthProjectVersion]:
-        return await list_project_versions(project_id)
+    async def list_mod_versions(self, project_id: str, loader: str, game_version: str) -> list[ModrinthProjectVersion]:
+        try:
+            _loader = MiniverseType(loader.title())
+        except ValueError:
+            raise ValidationException(f"Invalid loader: {loader}. Must be one of {[e.value for e in MiniverseType]}")
+        return await list_project_versions(project_id, _loader, game_version)

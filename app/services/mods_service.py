@@ -4,6 +4,7 @@ import httpx
 from litestar.exceptions import ValidationException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import logger
 from app.enums import MiniverseType
 from app.models import Miniverse, Mod
 from app.schemas import ModVersionType
@@ -129,12 +130,16 @@ async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSessio
         return mod
 
 
-async def install_mod_for_miniverse(mod_id: str, game_version: str | None, miniverse: Miniverse, db: AsyncSession, prioritize_release: bool = True) -> Mod:
+async def install_mod_for_miniverse(mod_id: str, miniverse: Miniverse, db: AsyncSession, game_version: str | None = None, prioritize_release: bool = True, retry_with_latest: bool = False) -> Mod:
     if game_version is None:
         game_version = miniverse.mc_version
     versions = await list_project_versions(mod_id, loader=miniverse.type, mc_version=game_version)
     if not versions:
-        raise ValidationException(f"No compatible versions found for mod {mod_id} with loader {miniverse.type} and game version {game_version}")
+        if retry_with_latest:
+            versions = await list_project_versions(mod_id, loader=miniverse.type)
+        if not versions:
+            raise ValidationException(f"No compatible versions found for mod {mod_id} with loader {miniverse.type} and game version {game_version}")
+        logger.warning(f"No direct compatible versions found for mod {mod_id} with loader {miniverse.type} and game version {game_version}, falling back to latest available version")
     if prioritize_release:
         versions = [v for v in versions if v.version_type == ModVersionType.RELEASE] or versions
     latest_version = sorted(versions, key=lambda v: v.date_published, reverse=True)[0]

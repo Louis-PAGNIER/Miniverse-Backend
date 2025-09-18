@@ -2,6 +2,8 @@ from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.utils import write_yaml_safe
 from app.models import Miniverse
 from app.core.config import settings, DATA_PATH
 
@@ -57,8 +59,8 @@ def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
                 miniverse.id: f"miniverse-{miniverse.id}:25565" for miniverse in miniverse_list
             },
             "try": [miniverse.id for miniverse in miniverse_list],
-            "forcedHost": {
-                f"{miniverse.subdomain}.miniverse.fr": miniverse.id for miniverse in miniverse_list
+            "forcedHosts": {
+                f"{miniverse.subdomain}.miniverse.fr": [miniverse.id] for miniverse in miniverse_list
             },
             "forwarding": {
                 "mode": "velocity",
@@ -89,10 +91,8 @@ async def update_proxy_config(db: AsyncSession) -> None:
 
     main_proxy_config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with main_proxy_config_path.open("w") as f:
-        yaml.dump(main_proxy_config, f)
-    with classic_proxy_config_path.open("w") as f:
-        yaml.dump(classic_proxy_config, f)
+    write_yaml_safe(main_proxy_config, main_proxy_config_path)
+    write_yaml_safe(classic_proxy_config, classic_proxy_config_path)
 
 
 async def start_proxy_containers() -> None:

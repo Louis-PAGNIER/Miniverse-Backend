@@ -42,9 +42,12 @@ class ModsController(Controller):
         return await get_version_details(version_id)
 
     @get("{project_id:str}/versions")
-    async def list_mod_versions(self, project_id: str, loader: str, game_version: str) -> list[ModrinthProjectVersion]:
-        try:
-            _loader = MiniverseType(loader.title())
-        except ValueError:
-            raise ValidationException(f"Invalid loader: {loader}. Must be one of {[e.value for e in MiniverseType]}")
+    async def list_mod_versions(self, project_id: str, loader: str | None, game_version: str | None) -> list[ModrinthProjectVersion]:
+        if loader is None:
+            _loader = None
+        else:
+            try:
+                _loader = MiniverseType(loader)
+            except ValueError:
+                raise ValidationException(f"Invalid loader: {loader}. Must be one of {[e.value for e in MiniverseType]}")
         return await list_project_versions(project_id, _loader, game_version)

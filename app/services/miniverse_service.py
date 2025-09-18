@@ -131,13 +131,23 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
     prioritize_release = not is_snapshot
 
     if not miniverse.is_on_main_proxy:
+        config_path = volume_data_path / "config"
+        config_path.mkdir(parents=True, exist_ok=True)
+
         if miniverse.type == MiniverseType.FABRIC:
-            await install_mod_for_miniverse("P7dR8mSH", miniverse.mc_version, miniverse, db, prioritize_release=prioritize_release) # Fabric API
-            await install_mod_for_miniverse("8dI2tmqs", miniverse.mc_version, miniverse, db, prioritize_release=prioritize_release) # FabricProxy-Lite
-            config_path = volume_data_path / "config"
-            config_path.mkdir(parents=True, exist_ok=True)
+            await install_mod_for_miniverse("P7dR8mSH", miniverse, db, prioritize_release=prioritize_release) # Fabric API
+            await install_mod_for_miniverse("8dI2tmqs", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
             fabric_proxy_lite_config = config_path / "FabricProxy-Lite.toml"
             with open(str(fabric_proxy_lite_config), "w") as f:
                 toml.dump({"secret": settings.PROXY_SECRET}, f)
+        elif miniverse.type == MiniverseType.NEO_FORGE or miniverse.type == MiniverseType.FORGE:
+            await install_mod_for_miniverse("vDyrHl8l", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
+            fabric_proxy_lite_config = config_path / "pcf-common.toml"
+            with open(str(fabric_proxy_lite_config), "w") as f:
+                toml.dump({
+                    "modernForwarding": {
+                        "forwardingSecret": settings.PROXY_SECRET,
+                    }
+                }, f)
         else:
             logger.warning(f"Miniverse type {miniverse.type} is currently not supported for standalone miniverses.")

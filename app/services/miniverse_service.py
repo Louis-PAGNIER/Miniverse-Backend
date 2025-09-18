@@ -128,7 +128,8 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
 
     # TODO: Move snapshot detection to a utility function
     is_snapshot = re.match(r"^\d{2}w\d{2}[a-z]$", game_version) is not None
-    prioritize_release = not is_snapshot
+    is_prerelease = re.match(r"^\d{1,2}\.\d{1,2}\.\d{1,2}-(pre|rc)\d*$", game_version) is not None
+    prioritize_release = not (is_snapshot or is_prerelease)
 
     if not miniverse.is_on_main_proxy:
         config_path = volume_data_path / "config"

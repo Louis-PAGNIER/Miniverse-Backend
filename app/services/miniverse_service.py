@@ -145,10 +145,6 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
             await install_mod_for_miniverse("vDyrHl8l", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
             fabric_proxy_lite_config = config_path / "pcf-common.toml"
             with open(str(fabric_proxy_lite_config), "w") as f:
-                toml.dump({
-                    "modernForwarding": {
-                        "forwardingSecret": settings.PROXY_SECRET,
-                    }
-                }, f)
+                toml.dump({"modernForwarding": { "forwardingSecret": settings.PROXY_SECRET } }, f)
         else:
             logger.warning(f"Miniverse type {miniverse.type} is currently not supported for standalone miniverses.")

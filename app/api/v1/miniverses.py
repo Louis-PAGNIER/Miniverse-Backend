@@ -6,10 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db_session
 from app.enums import Role
 from app.models import Miniverse, Mod, User
-from app.schemas import MiniverseCreate
+from app.schemas import MiniverseCreate, ModUpdateInfo
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse
-from app.services.mods_service import install_mod, uninstall_mod, get_mod
+from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates
 
 
 class MiniversesController(Controller):
@@ -56,7 +56,24 @@ class MiniversesController(Controller):
         if current_user.get_miniverse_role(mod.miniverse_id) < Role.MODERATOR:
             raise NotAuthorizedException("You are not authorized to uninstall mods in this miniverse")
 
-        miniverse = await get_miniverse(mod.miniverse_id, db)
-
-        await uninstall_mod(mod, miniverse, db)
+        await uninstall_mod(mod, db)
         return None
+
+    @post("/mods/{mod_id:str}/update/{new_version_id:str}")
+    async def update_mod(self, current_user: User, mod_id: str, new_version_id: str, db: AsyncSession) -> Mod:
+        if mod := get_mod(mod_id, db) is None:
+            raise NotFoundException("Mod not found in this miniverse")
+
+        if current_user.get_miniverse_role(mod.miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to update mods in this miniverse")
+
+        return await update_mod(mod, new_version_id, db)
+
+    @get("/{miniverse_id:str}/mods/updates")
+    async def list_mod_updates(self, current_user: User, miniverse_id: str, db: AsyncSession) -> dict[str, ModUpdateInfo]:
+        if current_user.get_miniverse_role(miniverse_id) < Role.USER:
+            raise NotAuthorizedException("You are not authorized to view mod updates in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        return await list_possible_mod_updates(miniverse)

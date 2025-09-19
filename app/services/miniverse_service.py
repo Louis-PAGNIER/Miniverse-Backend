@@ -18,7 +18,7 @@ import shutil
 import toml
 
 from app.services.proxy_service import update_proxy_config
-from app.services.mods_service import install_mod_for_miniverse
+from app.services.mods_service import automatic_mod_install
 
 
 def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -> Path:
@@ -136,13 +136,13 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
         config_path.mkdir(parents=True, exist_ok=True)
 
         if miniverse.type == MiniverseType.FABRIC:
-            await install_mod_for_miniverse("P7dR8mSH", miniverse, db, prioritize_release=prioritize_release) # Fabric API
-            await install_mod_for_miniverse("8dI2tmqs", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
+            await automatic_mod_install("P7dR8mSH", miniverse, db, prioritize_release=prioritize_release) # Fabric API
+            await automatic_mod_install("8dI2tmqs", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
             fabric_proxy_lite_config = config_path / "FabricProxy-Lite.toml"
             with open(str(fabric_proxy_lite_config), "w") as f:
                 toml.dump({"secret": settings.PROXY_SECRET}, f)
         elif miniverse.type == MiniverseType.NEO_FORGE or miniverse.type == MiniverseType.FORGE:
-            await install_mod_for_miniverse("vDyrHl8l", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
+            await automatic_mod_install("vDyrHl8l", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
             fabric_proxy_lite_config = config_path / "pcf-common.toml"
             with open(str(fabric_proxy_lite_config), "w") as f:
                 toml.dump({"modernForwarding": { "forwardingSecret": settings.PROXY_SECRET } }, f)

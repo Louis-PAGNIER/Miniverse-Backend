@@ -8,7 +8,8 @@ from app import logger
 from app.enums import MiniverseType
 from app.models import Miniverse, Mod
 from app.schemas import ModVersionType
-from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, ModrinthProjectVersion, ModrinthProject
+from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, ModrinthProjectVersion, ModrinthProject, \
+    ModUpdateStatus, ModUpdateInfo
 
 MODRINTH_BASE_URL = "https://api.modrinth.com/v2"
 
@@ -86,51 +87,92 @@ async def get_mod(mod_id: str, db: AsyncSession) -> Mod | None:
     return await db.get(Mod, mod_id)
 
 
-async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSession) -> Mod:
+async def download_mod_file(project: ModrinthProject, version: ModrinthProjectVersion, miniverse: Miniverse) -> str:
     from app.services.miniverse_service import get_miniverse_path
+    primary_file = next((f for f in version.files if f.primary), None)
+    if not primary_file:
+        raise ValidationException("No primary file found for this mod version")
+    extension = Path(primary_file.filename).suffix
+    if extension != ".jar":
+        raise ValidationException("Unsupported file type for mod installation: " + extension)
+
+    # TODO: wrap the name to be filesystem-safe
+    file_name = f"{project.slug}-{version.version_number}-{version.id}{extension}"
+
+    mods_path = get_miniverse_path(miniverse.id, "data", "mods")
+    mods_path.mkdir(parents=True, exist_ok=True)
+
     async with httpx.AsyncClient() as client:
-        version = await get_version_details(mod_version_id)
-        project = await get_project_details(version.project_id)
-
-        primary_file = next((f for f in version.files if f.primary), None)
-        if not primary_file:
-            raise ValidationException("No primary file found for this mod version")
-        extension = Path(primary_file.filename).suffix
-        if extension != ".jar":
-            raise ValidationException("Unsupported file type for mod installation: " + extension)
-
-        # TODO: wrap the name to be filesystem-safe
-        file_name = f"{project.slug}-{version.version_number}-{version.id}{extension}"
-
-        mod = Mod(
-            slug=project.slug,
-            version_id=version.id,
-            project_id=version.project_id,
-            title=project.title,
-            icon_url=project.icon_url,
-            version_name=version.name,
-            version_number=version.version_number,
-            file_name=file_name,
-            miniverse_id=miniverse.id,
-        )
-
-        db.add(mod)
-        await db.commit()
-        await db.refresh(mod)
-
-        mods_path = get_miniverse_path(miniverse.id,  "data", "mods")
-        mods_path.mkdir(parents=True, exist_ok=True)
-
         download_response = await client.get(primary_file.url)
-        download_response.raise_for_status()
+    download_response.raise_for_status()
 
-        with open(mods_path / file_name, "wb") as f:
-            f.write(download_response.content)
+    with open(mods_path / file_name, "wb") as f:
+        f.write(download_response.content)
 
-        return mod
+    return file_name
 
 
-async def install_mod_for_miniverse(mod_id: str, miniverse: Miniverse, db: AsyncSession, game_version: str | None = None, prioritize_release: bool = True, retry_with_latest: bool = False) -> Mod:
+async def delete_mod_file(mod: Mod) -> None:
+    from app.services.miniverse_service import get_miniverse_path
+    mods_path = get_miniverse_path(mod.miniverse_id,  "data", "mods")
+    mod_file_path = mods_path / mod.file_name
+    if mod_file_path.exists() and mod_file_path.is_file():
+        mod_file_path.unlink()
+
+
+async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSession) -> Mod:
+    version = await get_version_details(mod_version_id)
+    project = await get_project_details(version.project_id)
+
+    file_name = await download_mod_file(project, version, miniverse)
+    mod = Mod(
+        slug=project.slug,
+        version_id=version.id,
+        project_id=version.project_id,
+        title=project.title,
+        icon_url=project.icon_url,
+        version_name=version.name,
+        version_number=version.version_number,
+        file_name=file_name,
+        miniverse_id=miniverse.id,
+    )
+
+    db.add(mod)
+    await db.commit()
+    await db.refresh(mod)
+
+    return mod
+
+async def update_mod(mod: Mod, new_version_id: str, db: AsyncSession) -> Mod:
+    version = await get_version_details(new_version_id)
+    project = await get_project_details(version.project_id)
+
+    await delete_mod_file(mod)
+    file_name = await download_mod_file(project, version, mod.miniverse)
+
+    mod.version_id = version.id
+    mod.project_id = version.project_id
+    mod.title = project.title
+    mod.icon_url = project.icon_url
+    mod.version_name = version.name
+    mod.version_number = version.version_number
+    mod.file_name = file_name
+
+    await db.commit()
+    await db.refresh(mod)
+
+    return mod
+
+
+async def automatic_mod_install(
+        mod_id: str,
+        miniverse: Miniverse,
+        db: AsyncSession,
+        *,
+        game_version: str | None = None,
+        prioritize_release: bool = True,
+        retry_with_latest: bool = False
+) -> Mod:
     if game_version is None:
         game_version = miniverse.mc_version
     versions = await list_project_versions(mod_id, loader=miniverse.type, mc_version=game_version)
@@ -143,15 +185,41 @@ async def install_mod_for_miniverse(mod_id: str, miniverse: Miniverse, db: Async
     if prioritize_release:
         versions = [v for v in versions if v.version_type == ModVersionType.RELEASE] or versions
     latest_version = sorted(versions, key=lambda v: v.date_published, reverse=True)[0]
+
     return await install_mod(latest_version.id, miniverse, db)
 
 
-async def uninstall_mod(mod: Mod, miniverse: Miniverse, db: AsyncSession) -> None:
-    from app.services.miniverse_service import get_miniverse_path
-    mods_path = get_miniverse_path(miniverse.id,  "data", "mods")
-    mod_file_path = mods_path / mod.file_name
-    if mod_file_path.exists() and mod_file_path.is_file():
-        mod_file_path.unlink()
-
+async def uninstall_mod(mod: Mod, db: AsyncSession) -> None:
+    await delete_mod_file(mod)
     await db.delete(mod)
     await db.commit()
+
+
+async def list_possible_mod_updates(miniverse: Miniverse, game_version: str | None = None) -> dict[str, ModUpdateInfo]:
+    mods = miniverse.mods
+    updates = {}
+    if game_version is None:
+        game_version = miniverse.mc_version
+    for mod in mods:
+        try:
+            versions = await list_project_versions(mod.project_id, loader=miniverse.type, mc_version=game_version)
+            if not versions:
+                versions = await list_project_versions(mod.project_id, loader=miniverse.type)
+            if not versions:
+                logger.warning(f"No versions found for mod {mod.project_id} when checking for updates")
+                updates[mod.id] = ModUpdateInfo(ModUpdateStatus.ERROR, [], [])
+                continue
+            versions = sorted(versions, key=lambda v: v.date_published, reverse=True)
+            for version in versions:
+                if game_version in version.game_versions:
+                    if version.id == mod.version_id:
+                        updates[mod.id] = ModUpdateInfo(ModUpdateStatus.ALREADY_UP_TO_DATE, [version.id], [version.game_versions])
+                    else:
+                        updates[mod.id] = ModUpdateInfo(ModUpdateStatus.UPDATE_AVAILABLE, [version.id], [version.game_versions])
+                    break
+            else:
+                updates[mod.id] = ModUpdateInfo(ModUpdateStatus.NO_COMPATIBLE_VERSIONS, [v.id for v in versions], [v.game_versions for v in versions])
+        except Exception as e:
+            logger.error(f"Error checking for updates for mod {mod.id}: {e}")
+            updates[mod.id] = ModUpdateInfo(ModUpdateStatus.ERROR, [], [])
+    return updates

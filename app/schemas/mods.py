@@ -22,6 +22,19 @@ class ModVersionType(enum.Enum):
     BETA = "beta"
     ALPHA = "alpha"
 
+class ModUpdateStatus(enum.Enum):
+    ALREADY_UP_TO_DATE = "already_up_to_date"
+    UPDATE_AVAILABLE = "update_available"
+    NO_COMPATIBLE_VERSIONS = "no_compatible_versions"
+    ERROR = "error"
+
+@dataclass
+class ModUpdateInfo:
+    update_status: ModUpdateStatus
+    new_versions_ids: list[str]
+    game_versions: list[list[str]]  # list of compatible game versions for each new version
+
+# ================== Modrinth API Schemas ================== #
 @dataclass
 class ModrinthSearchFacets:
     project_type: ModrinthProjectType = None

@@ -61,6 +61,7 @@ class AsyncDockerController:
         tty: bool = False,
         stdin_open: bool = False,
         environment: dict[str, str] = None,
+        auto_remove: bool = False,
         **kwargs
     ) -> dict[str, Any]:
         def _create():
@@ -86,6 +87,7 @@ class AsyncDockerController:
                 tty=tty,
                 stdin_open=stdin_open,
                 environment=environment,
+                auto_remove=auto_remove,
                 **kwargs
             )
             return container.attrs

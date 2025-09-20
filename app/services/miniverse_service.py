@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from litestar.exceptions import ValidationException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +18,9 @@ import re
 import shutil
 import toml
 
+from app.services.minecraft_service import is_release
 from app.services.proxy_service import update_proxy_config
-from app.services.mods_service import automatic_mod_install
+from app.services.mods_service import automatic_mod_install, MODRINTH_BASE_URL
 
 
 def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -> Path:
@@ -126,10 +128,7 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
     volume_data_path = get_miniverse_path(miniverse.id, "data")
     game_version = miniverse.mc_version
 
-    # TODO: Move snapshot detection to a utility function
-    is_snapshot = re.match(r"^\d{2}w\d{2}[a-z]$", game_version) is not None
-    is_prerelease = re.match(r"^\d{1,2}\.\d{1,2}\.\d{1,2}-(pre|rc)\d*$", game_version) is not None
-    prioritize_release = not (is_snapshot or is_prerelease)
+    prioritize_release = is_release(game_version)
 
     if not miniverse.is_on_main_proxy:
         config_path = volume_data_path / "config"

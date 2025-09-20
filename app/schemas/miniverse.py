@@ -10,3 +10,8 @@ class MiniverseCreate:
     mc_version: str
     subdomain: str | None
     is_on_main_proxy: bool
+
+@dataclass
+class MiniverseUpdateMCVersion:
+    mc_version: str
+

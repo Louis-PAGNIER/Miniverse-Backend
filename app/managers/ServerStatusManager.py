@@ -55,15 +55,17 @@ class ServerStatusManager:
 
     def add_miniverse(self, miniverse: Miniverse):
         miniverse_id = miniverse.id
-        self.secrets[miniverse_id] = miniverse.management_server_secret
         if miniverse_id not in self.tasks:
+            self.secrets[miniverse_id] = miniverse.management_server_secret
             self.tasks[miniverse_id] = asyncio.create_task(self._run_client(miniverse_id))
             self.reset_tries(miniverse_id)
+            logger.info(f"Started searching for {miniverse_id} management server")
 
     def remove_miniverse(self, miniverse_id: str):
         if miniverse_id in self.tasks:
             self.tasks[miniverse_id].cancel()
             del self.tasks[miniverse_id]
+            logger.info(f"Stopped searching for {miniverse_id} management server")
 
     @staticmethod
     async def get_players_list(ws) -> list[Player]:
@@ -78,7 +80,6 @@ class ServerStatusManager:
             "miniverse-id": miniverse_id,
             "data": value
         }, "miniverse-updates")
-
 
     async def _run_client(self, miniverse_id: str):
         while True:

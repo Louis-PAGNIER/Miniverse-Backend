@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db_session
 from app.enums import Role
 from app.models import Miniverse, Mod, User
-from app.schemas import MiniverseCreate, ModUpdateInfo
+from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion
 from app.services.auth_service import get_current_user
-from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse
+from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
+    start_miniverse, stop_miniverse, restart_miniverse, update_miniverse
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates
 
 
@@ -39,6 +40,57 @@ class MiniversesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
         await delete_miniverse(miniverse, db)
         return None
+
+    @post("/{miniverse_id:str}/start")
+    async def start_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
+        if current_user.get_miniverse_role(miniverse_id) < Role.USER:
+            raise NotAuthorizedException("You are not authorized to start this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        if miniverse is None:
+            raise NotFoundException("Miniverse not found")
+
+        await start_miniverse(miniverse, db)
+
+        return miniverse
+
+    @post("/{miniverse_id:str}/stop")
+    async def stop_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
+        if current_user.get_miniverse_role(miniverse_id) < Role.USER:
+            raise NotAuthorizedException("You are not authorized to stop this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        if miniverse is None:
+            raise NotFoundException("Miniverse not found")
+
+        await stop_miniverse(miniverse, db)
+
+        return miniverse
+
+    @post("/{miniverse_id:str}/restart")
+    async def restart_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
+        if current_user.get_miniverse_role(miniverse_id) < Role.USER:
+            raise NotAuthorizedException("You are not authorized to restart this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        if miniverse is None:
+            raise NotFoundException("Miniverse not found")
+
+        await restart_miniverse(miniverse, db)
+
+        return miniverse
+
+    @post("/{miniverse_id:str}/update_mc_version")
+    async def update_miniverse(self, current_user: User, miniverse_id: str, data: MiniverseUpdateMCVersion, db: AsyncSession) -> Miniverse:
+        if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
+            raise NotAuthorizedException("You are not authorized to update this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        if miniverse is None:
+            raise NotFoundException("Miniverse not found")
+
+        return await update_miniverse(miniverse, data.mc_version, db)
+
 
     @post("/{miniverse_id:str}/install/mod/{mod_version_id:str}")
     async def install_mod(self, current_user: User, miniverse_id: str, mod_version_id: str, db: AsyncSession) -> Mod:

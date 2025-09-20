@@ -14,13 +14,12 @@ from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
 
-import re
 import shutil
 import toml
 
-from app.services.minecraft_service import is_release
+from app.services.minecraft_service import is_release, compare_versions
 from app.services.proxy_service import update_proxy_config
-from app.services.mods_service import automatic_mod_install, MODRINTH_BASE_URL
+from app.services.mods_service import automatic_mod_install
 
 
 def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -> Path:
@@ -60,15 +59,12 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
     await db.commit()
     await db.refresh(user_role)
 
-    container = await create_miniverse_container(db_miniverse, db)
-    db_miniverse.container_id = container["Id"]
-    await db.commit()
-    await db.refresh(db_miniverse)
+    volume_data_path = get_miniverse_path(db_miniverse.id, "data")
+    volume_data_path.mkdir(parents=True, exist_ok=True)
+    await init_data_path(db_miniverse, db)
 
-    await dockerctl.start_container(container["Id"])
+    await start_miniverse(db_miniverse, db)
     await update_proxy_config(db)
-
-    server_status_manager.add_miniverse(db_miniverse)
 
     return db_miniverse
 
@@ -92,11 +88,6 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
     logger.info(f"Creating miniverse container for miniverse {miniverse.name}")
     container_name = "miniverse-" + miniverse.id
 
-    volume_data_path = get_miniverse_path(miniverse.id, "data")
-    volume_data_path.mkdir(parents=True, exist_ok=True)
-
-    await init_data_path(miniverse, db)
-
     host_volume_data_path = get_miniverse_path(miniverse.id, "data", from_host=True)
 
     container = await dockerctl.create_container(
@@ -119,7 +110,12 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
         },
         tty=True,
         stdin_open=True,
+        auto_remove=True,
     )
+
+    miniverse.container_id = container["Id"]
+    await db.commit()
+    await db.refresh(miniverse)
 
     return container
 
@@ -147,3 +143,73 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
                 toml.dump({"modernForwarding": { "forwardingSecret": settings.PROXY_SECRET } }, f)
         else:
             logger.warning(f"Miniverse type {miniverse.type} is currently not supported for standalone miniverses.")
+
+
+async def start_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
+    miniverse.started = True
+    await db.commit()
+    await db.refresh(miniverse)
+
+    server_status_manager.add_miniverse(miniverse)
+
+    existing_container = await dockerctl.get_container_by_name("miniverse-" + miniverse.id)
+    if existing_container:
+        miniverse.container_id = existing_container["Id"]
+        await db.commit()
+        await db.refresh(miniverse)
+        await dockerctl.start_container(existing_container["Id"])
+        return existing_container
+
+    container = await create_miniverse_container(miniverse, db)
+    await dockerctl.start_container(container["Id"])
+    return container
+
+
+async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
+    if miniverse.container_id is None:
+        container = await dockerctl.get_container_by_name("miniverse-" + miniverse.id)
+        if container:
+            miniverse.container_id = container["Id"]
+            await db.commit()
+            await db.refresh(miniverse)
+
+    if miniverse.container_id:
+        await dockerctl.stop_container(miniverse.container_id)
+    server_status_manager.remove_miniverse(miniverse)
+
+    miniverse.started = False
+    miniverse.container_id = None
+    await db.commit()
+    await db.refresh(miniverse)
+
+
+async def restart_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
+    await stop_miniverse(miniverse, db)
+    return await start_miniverse(miniverse, db)
+
+
+async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncSession) -> Miniverse:
+    if miniverse.mc_version == new_mc_version:
+        raise ValidationException("The new Minecraft version is the same as the current one.")
+
+    version_comparison = await compare_versions(miniverse.mc_version, new_mc_version)
+    if version_comparison is None:
+        raise ValidationException("The specified Minecraft versions is invalid.")
+    if version_comparison > 0:
+        raise ValidationException("Downgrading Minecraft versions is not supported.")
+
+    await stop_miniverse(miniverse, db)
+
+    miniverse.mc_version = new_mc_version
+    await db.commit()
+    await db.refresh(miniverse)
+
+    # TODO: Delete previous jar files
+
+    if miniverse.type in [MiniverseType.FORGE, MiniverseType.NEO_FORGE, MiniverseType.FABRIC]:
+        # TODO: Update mods to compatible versions
+        pass
+
+    await start_miniverse(miniverse, db)
+
+    return miniverse

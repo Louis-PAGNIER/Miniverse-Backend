@@ -39,6 +39,14 @@ class AsyncDockerController:
             lambda: [c.attrs for c in self.client.containers.list(all=all)]
         )
 
+    async def get_container_by_name(self, name: str) -> dict[str, Any] | None:
+        def _get():
+            containers = self.client.containers.list(all=True, filters={"name": name})
+            if containers:
+                return containers[0].attrs
+            return None
+        return await asyncio.to_thread(_get)
+
     async def get_stats(self, container_ids: list[str]) -> dict[str, Any]:
         def _get_stats(container_id):
             container = self.client.containers.get(container_id)

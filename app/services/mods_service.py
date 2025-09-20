@@ -16,7 +16,7 @@ MODRINTH_BASE_URL = "https://api.modrinth.com/v2"
 def dumps_values(values: list[str] | str) -> str:
     if isinstance(values, str):
         values = [values]
-    return str(values).replace("'", "").replace("\\", "")
+    return str(values).replace("'", '"').replace("\\", "")
 
 def build_or_facets(key: str, values: list[str] | str) -> str:
     if isinstance(values, str):
@@ -59,7 +59,7 @@ async def list_project_versions(project_id: str, loader: MiniverseType = None, m
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{MODRINTH_BASE_URL}/project/{project_id}/version",
                                     params={
-                                      "loaders": dumps_values(loader.value) if loader else None,
+                                      "loaders": dumps_values(loader.value.lower()) if loader else None,
                                       "game_versions": dumps_values(mc_version) if mc_version else None
                                     })
         response.raise_for_status()
@@ -141,6 +141,8 @@ async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSessio
     await db.commit()
     await db.refresh(mod)
 
+    logger.info(f"Mod {mod.slug} installed")
+
     return mod
 
 async def update_mod(mod: Mod, new_version_id: str, db: AsyncSession) -> Mod:
@@ -160,6 +162,8 @@ async def update_mod(mod: Mod, new_version_id: str, db: AsyncSession) -> Mod:
 
     await db.commit()
     await db.refresh(mod)
+
+    logger.info(f"Mod {mod.slug} updated")
 
     return mod
 
@@ -194,6 +198,8 @@ async def uninstall_mod(mod: Mod, db: AsyncSession) -> None:
     await db.delete(mod)
     await db.commit()
 
+    logger.info(f"Mod {mod.slug} uninstalled")
+
 
 async def list_possible_mod_updates(miniverse: Miniverse, game_version: str | None = None) -> dict[str, ModUpdateInfo]:
     mods = miniverse.mods
@@ -211,7 +217,7 @@ async def list_possible_mod_updates(miniverse: Miniverse, game_version: str | No
                 continue
             versions = sorted(versions, key=lambda v: v.date_published, reverse=True)
             for version in versions:
-                if game_version in version.game_versions:
+                if game_version in version.game_versions or version.id == mod.version_id:
                     if version.id == mod.version_id:
                         updates[mod.id] = ModUpdateInfo(ModUpdateStatus.ALREADY_UP_TO_DATE, [version.id], [version.game_versions])
                     else:

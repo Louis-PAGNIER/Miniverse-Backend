@@ -39,14 +39,6 @@ class AsyncDockerController:
             lambda: [c.attrs for c in self.client.containers.list(all=all)]
         )
 
-    async def get_container_by_name(self, name: str) -> dict[str, Any] | None:
-        def _get():
-            containers = self.client.containers.list(all=True, filters={"name": name})
-            if containers:
-                return containers[0].attrs
-            return None
-        return await asyncio.to_thread(_get)
-
     async def get_stats(self, container_ids: list[str]) -> dict[str, Any]:
         def _get_stats(container_id):
             container = self.client.containers.get(container_id)
@@ -118,9 +110,13 @@ class AsyncDockerController:
         )
 
     async def remove_container(self, container_id: str):
-        return await asyncio.to_thread(
-            lambda: self.client.containers.get(container_id).remove(force=True)
-        )
+        def _remove():
+            try:
+                container = self.client.containers.get(container_id)
+                container.remove(force=True)
+            except docker.errors.NotFound:
+                pass
+        return await asyncio.to_thread(_remove)
 
     async def get_container(self, container_id: str) -> dict[str, Any]:
         def _get():
@@ -134,7 +130,6 @@ class AsyncDockerController:
     async def get_container_by_name(self, name: str) -> dict[str, Any] | None:
         def _get():
             containers = self.client.containers.list(all=True, filters={"name": name})
-            print(containers)
             if containers:
                 return containers[0].attrs
             return None

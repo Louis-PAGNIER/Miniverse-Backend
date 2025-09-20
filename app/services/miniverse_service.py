@@ -11,6 +11,7 @@ from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
 from app.managers import server_status_manager
 from app.models import Miniverse, MiniverseUserRole, User
+from app.schemas import ModUpdateStatus
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
 
@@ -19,7 +20,7 @@ import toml
 
 from app.services.minecraft_service import is_release, compare_versions
 from app.services.proxy_service import update_proxy_config
-from app.services.mods_service import automatic_mod_install
+from app.services.mods_service import automatic_mod_install, list_possible_mod_updates, update_mod
 
 
 def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -> Path:
@@ -188,7 +189,7 @@ async def restart_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
     return await start_miniverse(miniverse, db)
 
 
-async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncSession) -> Miniverse:
+async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncSession, force_update: bool = False) -> Miniverse:
     if miniverse.mc_version == new_mc_version:
         raise ValidationException("The new Minecraft version is the same as the current one.")
 
@@ -198,6 +199,25 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
     if version_comparison > 0:
         raise ValidationException("Downgrading Minecraft versions is not supported.")
 
+    if miniverse.type in [MiniverseType.FORGE, MiniverseType.NEO_FORGE, MiniverseType.FABRIC]:
+        # TODO: Update mods to compatible versions
+        possible_mod_updates = await list_possible_mod_updates(miniverse, new_mc_version)
+
+        safe_update = True
+        for mod_id, update_info in possible_mod_updates.items():
+            if update_info.update_status in [ModUpdateStatus.ERROR, ModUpdateStatus.NO_COMPATIBLE_VERSIONS]:
+                safe_update = False
+                logger.warning(f"Mod {mod_id} cannot be updated to be compatible with Minecraft {new_mc_version}: {update_info.update_status}")
+
+        if not safe_update and not force_update:
+            raise ValidationException("One or more mods cannot be updated to be compatible with the new Minecraft version.")
+
+        for mod in miniverse.mods:
+            update_info = possible_mod_updates[mod.id]
+            if update_info.update_status == ModUpdateStatus.UPDATE_AVAILABLE:
+                new_version_id = update_info.new_versions_ids[0]
+                await update_mod(mod, new_version_id, db)
+
     await stop_miniverse(miniverse, db)
 
     miniverse.mc_version = new_mc_version
@@ -205,10 +225,6 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
     await db.refresh(miniverse)
 
     # TODO: Delete previous jar files
-
-    if miniverse.type in [MiniverseType.FORGE, MiniverseType.NEO_FORGE, MiniverseType.FABRIC]:
-        # TODO: Update mods to compatible versions
-        pass
 
     await start_miniverse(miniverse, db)
 

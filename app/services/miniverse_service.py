@@ -45,7 +45,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
         description=miniverse.description,
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
-        is_on_main_proxy=miniverse.is_on_main_proxy,
+        is_on_lite_proxy=miniverse.is_on_lite_proxy,
         management_server_secret=generate_random_string(40),
     )
     db.add(db_miniverse)
@@ -109,7 +109,7 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
             "TYPE": miniverse.type.value.upper(),
             "VERSION": miniverse.mc_version,
             "MOTD": f"Welcome to {miniverse.name}!",
-            "ONLINE_MODE": "TRUE" if miniverse.is_on_main_proxy else "FALSE",
+            "ONLINE_MODE": "TRUE" if miniverse.is_on_lite_proxy else "FALSE",
             "SERVER_PORT": "25565",
             "MANAGEMENT_SERVER_ENABLED": "TRUE",
             "MANAGEMENT_SERVER_TLS_ENABLED": "FALSE",
@@ -135,7 +135,7 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
 
     prioritize_release = is_release(game_version)
 
-    if not miniverse.is_on_main_proxy:
+    if not miniverse.is_on_lite_proxy:
         config_path = volume_data_path / "config"
         config_path.mkdir(parents=True, exist_ok=True)
 

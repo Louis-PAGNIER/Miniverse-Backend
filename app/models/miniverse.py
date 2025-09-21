@@ -19,7 +19,7 @@ class Miniverse(Base):
     container_id: Mapped[str | None] = mapped_column(String)
     mc_version: Mapped[str] = mapped_column(String)
     subdomain: Mapped[str] = mapped_column(String)
-    is_on_main_proxy: Mapped[bool] = mapped_column(Boolean)
+    is_on_lite_proxy: Mapped[bool] = mapped_column(Boolean)
     started: Mapped[bool] = mapped_column(Boolean, default=False, info=dto_field("read-only"))
     management_server_secret: Mapped[str | None] = mapped_column(String(length=40), info=dto_field("private"))
 

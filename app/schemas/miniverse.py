@@ -9,7 +9,7 @@ class MiniverseCreate:
     description: str | None
     mc_version: str
     subdomain: str | None
-    is_on_main_proxy: bool
+    is_on_lite_proxy: bool
 
 @dataclass
 class MiniverseUpdateMCVersion:

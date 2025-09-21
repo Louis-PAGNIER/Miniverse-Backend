@@ -1,18 +1,16 @@
+import asyncio
+
 from dotenv import load_dotenv
 
-from app import logger
 from app.api.v1.websockets import websocket_miniverse_updates_handler
 from app.db.session import session_config
 from app.enums import Role
-from app.services.miniverse_service import get_miniverses
-from app.services.proxy_service import start_proxy_containers, update_proxy_config
+from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
+from app.services.proxy_service import start_proxy_containers, update_proxy_config, stop_proxy_containers
 
 load_dotenv()
 
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
-from litestar import Litestar, Request
+from litestar import Litestar
 from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import SwaggerRenderPlugin
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
@@ -27,8 +25,6 @@ from app.core.channels import channels_plugin
 
 from app.schemas.user import UserCreate
 from app.services.user_service import get_user_by_username, create_user
-
-import httpx
 
 async def proxy_startup():
     async with session_config.get_session() as session:
@@ -48,11 +44,6 @@ async def db_startup():
             await create_user(UserCreate(admin_username, admin_password, Role.ADMIN), session)
 
 
-async def docker_startup():
-    await dockerctl.initialize()
-    await start_proxy_containers()
-
-
 async def server_status_manager_startup():
     async with session_config.get_session() as session:
         miniverses = await get_miniverses(session)
@@ -60,21 +51,31 @@ async def server_status_manager_startup():
             server_status_manager.add_miniverse(miniverse)
 
 
-@asynccontextmanager
-async def httpx_client_lifespan(app: Litestar) -> AsyncGenerator[None, None]:
-    app.state.httpx_client = httpx.AsyncClient(timeout=10.0)
-    yield
-    await app.state.httpx_client.aclose()
+async def docker_startup():
+    await dockerctl.initialize()
+    await start_proxy_containers()
+    async with session_config.get_session() as session:
+        miniverses = await get_miniverses(session)
+        for miniverse in miniverses:
+            if miniverse.started:
+                await start_miniverse(miniverse, session)
 
+async def docker_shutdown():
+    async with session_config.get_session() as session:
+        miniverses = await get_miniverses(session)
 
-def get_http_client(request: Request) -> httpx.AsyncClient:
-    return request.app.state.httpx_client
+        tasks = [
+            stop_miniverse_container(miniverse)
+            for miniverse in miniverses
+        ]
+        tasks.append(stop_proxy_containers())
+        await asyncio.gather(*tasks)
 
 
 app = Litestar(
     route_handlers=[login, UsersController, MiniversesController, ModsController, websocket_miniverse_updates_handler],
-    lifespan=[httpx_client_lifespan],
-    on_startup=[docker_startup, db_startup, proxy_startup, server_status_manager_startup],
+    on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
+    on_shutdown=[docker_shutdown],
     on_app_init=[oauth2_auth.on_app_init],
     openapi_config=OpenAPIConfig(
         title="Miniverse API",

@@ -9,6 +9,8 @@ from app.core import settings
 from app.core.config import DATA_PATH
 from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
+from app.events.miniverse_events import publish_miniverse_deleted_event, publish_miniverse_created_event, \
+    publish_miniverse_updated_event
 from app.managers import server_status_manager
 from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas import ModUpdateStatus
@@ -67,22 +69,28 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
     await start_miniverse(db_miniverse, db)
     await update_proxy_config(db)
 
+    publish_miniverse_created_event(db_miniverse.id)
+
     return db_miniverse
 
 
 async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
-    server_status_manager.remove_miniverse(miniverse.id)
+    miniverse_id = miniverse.id
+    server_status_manager.remove_miniverse(miniverse_id)
     if miniverse.container_id:
         # remove_container also stops the container if it's running using force=True (SIGKILL)
-        logger.info(f"Deleting miniverse {miniverse.name} (ID: {miniverse.id})")
+        logger.info(f"Deleting miniverse {miniverse.name} (ID: {miniverse_id})")
         await dockerctl.remove_container(miniverse.container_id)
 
-    volume_base_path = get_miniverse_path(miniverse.id)
+    volume_base_path = get_miniverse_path(miniverse_id)
     if volume_base_path.exists() and volume_base_path.is_dir():
         shutil.rmtree(volume_base_path)
+
     await db.delete(miniverse)
     await db.commit()
     await update_proxy_config(db)
+
+    publish_miniverse_deleted_event(miniverse_id)
 
 
 async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> dict:
@@ -163,25 +171,33 @@ async def start_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
 
     container = await create_miniverse_container(miniverse, db)
     await dockerctl.start_container(container["Id"])
+
+    publish_miniverse_updated_event(miniverse.id)
+
     return container
 
 
-async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
-    if miniverse.container_id is None:
+async def stop_miniverse_container(miniverse: Miniverse) -> None:
+    container_id = miniverse.container_id
+    if container_id is None:
         container = await dockerctl.get_container_by_name("miniverse-" + miniverse.id)
         if container:
-            miniverse.container_id = container["Id"]
-            await db.commit()
-            await db.refresh(miniverse)
-
+            container_id = container["Id"]
     if miniverse.container_id:
-        await dockerctl.stop_container(miniverse.container_id)
-    server_status_manager.remove_miniverse(miniverse)
+        await dockerctl.stop_container(container_id)
+
+
+async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
+    await stop_miniverse_container(miniverse)
 
     miniverse.started = False
     miniverse.container_id = None
     await db.commit()
     await db.refresh(miniverse)
+
+    server_status_manager.remove_miniverse(miniverse)
+
+    publish_miniverse_updated_event(miniverse.id)
 
 
 async def restart_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:

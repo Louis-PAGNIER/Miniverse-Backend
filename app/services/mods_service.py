@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.enums import MiniverseType
+from app.events.miniverse_events import publish_miniverse_updated_event
 from app.models import Miniverse, Mod
 from app.schemas import ModVersionType
 from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, ModrinthProjectVersion, ModrinthProject, \
@@ -142,6 +143,7 @@ async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSessio
     await db.refresh(mod)
 
     logger.info(f"Mod {mod.slug} installed")
+    publish_miniverse_updated_event(miniverse.id)
 
     return mod
 
@@ -164,6 +166,7 @@ async def update_mod(mod: Mod, new_version_id: str, db: AsyncSession) -> Mod:
     await db.refresh(mod)
 
     logger.info(f"Mod {mod.slug} updated")
+    publish_miniverse_updated_event(mod.miniverse_id)
 
     return mod
 
@@ -194,11 +197,14 @@ async def automatic_mod_install(
 
 
 async def uninstall_mod(mod: Mod, db: AsyncSession) -> None:
+    miniverse_id = mod.miniverse_id
+
     await delete_mod_file(mod)
     await db.delete(mod)
     await db.commit()
 
     logger.info(f"Mod {mod.slug} uninstalled")
+    publish_miniverse_updated_event(miniverse_id)
 
 
 async def list_possible_mod_updates(miniverse: Miniverse, game_version: str | None = None) -> dict[str, ModUpdateInfo]:

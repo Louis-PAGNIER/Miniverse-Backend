@@ -1,14 +1,12 @@
 import asyncio
 import json
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Coroutine
 
-import rich
 import websockets
 
 from app import logger
-from app.core import root_store, channels_plugin
+from app.core import root_store
+from app.events.miniverse_events import publish_miniverse_players_event
 from app.models import Miniverse
 from app.schemas import Player
 
@@ -72,22 +70,16 @@ class ServerStatusManager:
         await ws.send(json.dumps({"method": "minecraft:players", "id": 1}))
         return json.loads(await ws.recv()).get("result", [])
 
-    @staticmethod
-    async def store_and_publish(miniverse_id: str, key: str, value: Any):
-        await server_status_store.set(f"{miniverse_id}.{key}", json.dumps(value))
-        channels_plugin.publish({
-            "type": key,
-            "miniverse-id": miniverse_id,
-            "data": value
-        }, "miniverse-updates")
-
     async def _run_client(self, miniverse_id: str):
         while True:
             try:
                 async with self.get_ws_connection(miniverse_id) as ws:
                     self.reset_tries(miniverse_id)
                     logger.info(f"Successfully connected to management server for miniverse {miniverse_id}")
-                    await self.store_and_publish(miniverse_id, "players", await self.get_players_list(ws))
+                    players_list = await self.get_players_list(ws)
+                    await server_status_store.set(f"{miniverse_id}.players", json.dumps(players_list))
+                    publish_miniverse_players_event(miniverse_id, players_list)
+
                     async for message in ws:
                         data = json.loads(message)
                         await self.handle_management_server_event(miniverse_id, data)
@@ -102,13 +94,21 @@ class ServerStatusManager:
 
         if method in ["notification:players/joined", "notification:players/left"]:
             async with self.get_ws_connection(miniverse_id) as ws:
-                await self.store_and_publish(miniverse_id, "players", await self.get_players_list(ws))
+                players_list = await self.get_players_list(ws)
+                await server_status_store.set(f"{miniverse_id}.players", json.dumps(players_list))
+                publish_miniverse_players_event(miniverse_id, players_list)
 
         elif method == "notification:server/saving":
             logger.info(f"Server save started for miniverse {miniverse_id}")
 
         elif method == "notification:server/saved":
             logger.info(f"Server save completed for miniverse {miniverse_id}")
+
+        elif method == "notification:server/started":
+            logger.info(f"Miniverse {miniverse_id} started")
+
+        elif method == "notification:server/stopping":
+            logger.info(f"Miniverse {miniverse_id} is stopping...")
 
         else:
             # rich.print_json(data=data) # For debugging purposes

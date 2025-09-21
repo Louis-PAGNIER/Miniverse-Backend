@@ -109,6 +109,7 @@ async def start_proxy_containers() -> None:
             ports={"25565/tcp": 25565},
             entrypoint="/gate",
             command=["--config", "/configs/config-main.yml"],
+            auto_remove=True,
         )
         await dockerctl.start_container(main_container["Id"])
     else:
@@ -123,9 +124,20 @@ async def start_proxy_containers() -> None:
             volumes={str(classic_proxy_config_path.parent): VolumeConfig(bind="/configs")},
             ports={"8080/tcp": 8080},
             entrypoint="/gate",
-            command=["--config", "/configs/config-classic.yml"]
+            command=["--config", "/configs/config-classic.yml"],
+            auto_remove=True,
         )
         await dockerctl.start_container(classic_container["Id"])
     else:
         await dockerctl.restart_container(classic_container["Id"])
+
+
+async def stop_proxy_containers() -> None:
+    main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
+    if main_container:
+        await dockerctl.stop_container(main_container["Id"])
+
+    classic_container = await dockerctl.get_container_by_name("miniverse-gate-classic")
+    if classic_container:
+        await dockerctl.stop_container(classic_container["Id"])
 

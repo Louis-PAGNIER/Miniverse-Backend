@@ -14,6 +14,7 @@ from litestar import Litestar
 from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import SwaggerRenderPlugin
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
+from litestar.config.cors import CORSConfig
 
 from app.db import Base
 from app.api.v1 import oauth2_auth, login
@@ -71,8 +72,10 @@ async def docker_shutdown():
         tasks.append(stop_proxy_containers())
         await asyncio.gather(*tasks)
 
+cors_config = CORSConfig(allow_origins=["*"])
 
 app = Litestar(
+    cors_config=cors_config,
     route_handlers=[login, UsersController, MiniversesController, ModsController, websocket_miniverse_updates_handler],
     on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
     on_shutdown=[docker_shutdown],

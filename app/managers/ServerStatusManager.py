@@ -92,22 +92,22 @@ class ServerStatusManager:
         if (method := data.get("method")) is None:
             return
 
-        if method in ["notification:players/joined", "notification:players/left"]:
+        if method in ["minecraft:notification/players/joined", "minecraft:notification/players/left"]:
             async with self.get_ws_connection(miniverse_id) as ws:
                 players_list = await self.get_players_list(ws)
                 await server_status_store.set(f"{miniverse_id}.players", json.dumps(players_list))
                 publish_miniverse_players_event(miniverse_id, players_list)
 
-        elif method == "notification:server/saving":
+        elif method == "minecraft:notification/server/saving":
             logger.info(f"Server save started for miniverse {miniverse_id}")
 
-        elif method == "notification:server/saved":
+        elif method == "minecraft:notification/server/saved":
             logger.info(f"Server save completed for miniverse {miniverse_id}")
 
-        elif method == "notification:server/started":
+        elif method == "minecraft:notification/server/started":
             logger.info(f"Miniverse {miniverse_id} started")
 
-        elif method == "notification:server/stopping":
+        elif method == "minecraft:notification/server/stopping":
             logger.info(f"Miniverse {miniverse_id} is stopping...")
 
         else:

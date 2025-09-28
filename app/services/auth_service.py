@@ -39,5 +39,6 @@ oauth2_auth = OAuth2PasswordBearerAuth[User](
     token_secret=settings.JWT_SECRET,
     token_url="/login",
     exclude=["/login", "/docs"],
+    samesite="none",
+    secure=True
 )
-

@@ -10,7 +10,7 @@ from app.services.user_service import create_user, get_users, get_user
 
 
 class UsersController(Controller):
-    path = "/users"
+    path = "/api/users"
     tags = ["Users"]
     dependencies = {
         "db": Provide(get_db_session),

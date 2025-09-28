@@ -16,7 +16,7 @@ from app.services.auth_service import verify_password, oauth2_auth
 from app.services.user_service import get_user_by_username
 
 
-@post("/login", dependencies = {"db": Provide(get_db_session)}, tags=["Authentication"])
+@post("/api/login", dependencies = {"db": Provide(get_db_session)}, tags=["Authentication"])
 async def login(data: Annotated[UserLogin, Body(media_type=RequestEncodingType.URL_ENCODED)], db: AsyncSession) -> Response[OAuth2Login]:
     user = await get_user_by_username(data.username, db)
     if not user or not verify_password(data.password, user.hashed_password):

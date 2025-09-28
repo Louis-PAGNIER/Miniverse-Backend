@@ -36,8 +36,8 @@ class User(Base):
 class MiniverseUserRole(Base):
     __tablename__ = "miniverse_user_roles"
 
-    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), primary_key=True)
-    miniverse_id: Mapped[str] = mapped_column(String, ForeignKey("miniverses.id"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), info=dto_field("read-only"), primary_key=True)
+    miniverse_id: Mapped[str] = mapped_column(String, ForeignKey("miniverses.id"), info=dto_field("read-only"), primary_key=True)
     role: Mapped[Role] = mapped_column(Enum(Role))
 
     user = relationship("User", back_populates="miniverses_roles", info=dto_field("private"), lazy="selectin")

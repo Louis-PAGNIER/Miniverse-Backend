@@ -72,7 +72,7 @@ async def docker_shutdown():
         tasks.append(stop_proxy_containers())
         await asyncio.gather(*tasks)
 
-cors_config = CORSConfig(allow_origins=["*"])
+cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)
 
 app = Litestar(
     cors_config=cors_config,

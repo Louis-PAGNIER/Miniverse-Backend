@@ -16,7 +16,7 @@ class Miniverse(Base):
     name: Mapped[str] = mapped_column(String)
     type: Mapped[MiniverseType] = mapped_column(Enum(MiniverseType))
     description: Mapped[str | None] = mapped_column(Text)
-    container_id: Mapped[str | None] = mapped_column(String)
+    container_id: Mapped[str | None] = mapped_column(String, info=dto_field("private"))
     mc_version: Mapped[str] = mapped_column(String)
     subdomain: Mapped[str] = mapped_column(String)
     is_on_lite_proxy: Mapped[bool] = mapped_column(Boolean)

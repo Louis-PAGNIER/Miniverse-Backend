@@ -15,7 +15,7 @@ from app.services.mods_service import search_modrinth_projects, get_project_deta
 
 
 class ModsController(Controller):
-    path = "/mods"
+    path = "/api/mods"
     tags = ["Mods"]
     dependencies = {
         "db": Provide(get_db_session),

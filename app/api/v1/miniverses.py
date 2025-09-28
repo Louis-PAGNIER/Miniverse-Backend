@@ -1,3 +1,5 @@
+import json
+
 from litestar import get, post, Controller, delete
 from litestar.di import Provide
 from litestar.exceptions import NotFoundException, NotAuthorizedException
@@ -5,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.enums import Role
+from app.managers.ServerStatusManager import server_status_store
 from app.models import Miniverse, Mod, User
-from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion
+from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
     start_miniverse, stop_miniverse, restart_miniverse, update_miniverse
@@ -14,7 +17,7 @@ from app.services.mods_service import get_mod, install_mod, uninstall_mod, updat
 
 
 class MiniversesController(Controller):
-    path = "/miniverses"
+    path = "/api/miniverses"
     tags = ["Miniverses"]
     dependencies = {
         "db": Provide(get_db_session),
@@ -22,8 +25,9 @@ class MiniversesController(Controller):
     }
 
     @get("/")
-    async def list_miniverses(self, db: AsyncSession) -> list[Miniverse]:
-        return await get_miniverses(db)
+    async def list_miniverses(self, current_user: User, db: AsyncSession) -> list[Miniverse]:
+        miniverses = await get_miniverses(db)
+        return [m for m in miniverses if current_user.get_miniverse_role(m.id) >= Role.USER]
 
     @post("/")
     async def create_miniverse(self, current_user: User, data: MiniverseCreate, db: AsyncSession) -> Miniverse:
@@ -129,3 +133,22 @@ class MiniversesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
 
         return await list_possible_mod_updates(miniverse)
+
+    @get("/players")
+    async def list_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:
+        miniverses = await get_miniverses(db)
+        miniverses = [m for m in miniverses if current_user.get_miniverse_role(m.id) >= Role.USER]
+
+        result: dict[str, list[Player]] = {}
+        for miniverse in miniverses:
+            if not miniverse.started:
+                result[miniverse.id] = []
+                continue
+
+            json_raw = await server_status_store.get(f"{miniverse.id}.players")
+            if json_raw is None:
+                result[miniverse.id] = []
+            else:
+                result[miniverse.id] = json.loads(json_raw)
+
+        return result

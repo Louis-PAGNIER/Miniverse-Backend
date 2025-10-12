@@ -225,8 +225,8 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
                 safe_update = False
                 logger.warning(f"Mod {mod_id} cannot be updated to be compatible with Minecraft {new_mc_version}: {update_info.update_status}")
 
-        if not safe_update and not force_update:
-            raise ValidationException("One or more mods cannot be updated to be compatible with the new Minecraft version.")
+        if not safe_update or force_update:
+            raise ValidationException("One or more mods cannot be updated to be compatible with the specified Minecraft version.")
 
         for mod in miniverse.mods:
             update_info = possible_mod_updates[mod.id]

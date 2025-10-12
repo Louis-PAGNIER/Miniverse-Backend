@@ -2,6 +2,7 @@ import asyncio
 
 from dotenv import load_dotenv
 
+from app.api.v1.minecraft import MinecraftController
 from app.api.v1.websockets import websocket_miniverse_updates_handler
 from app.db.session import session_config
 from app.enums import Role
@@ -76,7 +77,7 @@ cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)
 
 app = Litestar(
     cors_config=cors_config,
-    route_handlers=[login, UsersController, MiniversesController, ModsController, websocket_miniverse_updates_handler],
+    route_handlers=[login, UsersController, MiniversesController, ModsController, MinecraftController, websocket_miniverse_updates_handler],
     on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
     on_shutdown=[docker_shutdown],
     on_app_init=[oauth2_auth.on_app_init],

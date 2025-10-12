@@ -21,4 +21,6 @@ async def login(data: Annotated[UserLogin, Body(media_type=RequestEncodingType.U
     user = await get_user_by_username(data.username, db)
     if not user or not verify_password(data.password, user.hashed_password):
         raise NotFoundException(detail="User not found or password is incorrect")
-    return oauth2_auth.login(identifier=str(user.id), token_expiration=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    return oauth2_auth.login(identifier=user.id,
+                             token_expiration=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+                             token_extras={'user': {'id': user.id, 'username': user.username, 'role': user.role}})

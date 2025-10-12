@@ -19,7 +19,6 @@ class ManagementServerEvent:
 def uri_from_miniverse_id(miniverse_id: str) -> str:
     return f"ws://miniverse-{miniverse_id}:25585"
 
-
 class ServerStatusManager:
     def __init__(self):
         self.tasks: dict[str, asyncio.Task] = {}

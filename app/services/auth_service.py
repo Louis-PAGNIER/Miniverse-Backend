@@ -37,8 +37,8 @@ def moderator_user_guard(connection: ASGIConnection, _: BaseRouteHandler) -> Non
 oauth2_auth = OAuth2PasswordBearerAuth[User](
     retrieve_user_handler=retrieve_user_handler,
     token_secret=settings.JWT_SECRET,
-    token_url="/login",
-    exclude=["/login", "/docs"],
+    token_url="/api/login",
+    exclude=["/api/login", "/docs"],
     samesite="none",
     secure=True
 )

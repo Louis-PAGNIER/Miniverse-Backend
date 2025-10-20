@@ -36,9 +36,8 @@ services:
 
 networks:
   miniverse-net:
-    external: true
+    name: miniverse-net
   redis-net:
-    external: false
 
 volumes:
   redis-data:

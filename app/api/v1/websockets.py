@@ -1,4 +1,3 @@
-import base64
 import json
 
 from litestar import websocket, WebSocket
@@ -7,7 +6,6 @@ from litestar.exceptions import WebSocketDisconnect
 from websockets import ConnectionClosedError
 
 from app.enums import Role
-from app.models import MiniverseUserRole, User
 
 
 async def handle_miniverse_channel_message(socket: WebSocket, message: bytes) -> None:

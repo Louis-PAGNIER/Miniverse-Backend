@@ -5,9 +5,9 @@ from pydantic_settings import BaseSettings
 
 # Some settings have default values
 class Settings(BaseSettings):
-    HOST_MODE: str = "docker"  # Either "docker" or "host"
-    JWT_SECRET: str
-    PROXY_SECRET: str
+    PROXY_SOCKS: str | None = None
+    JWT_SECRET: str # TODO : can we generate SECRET directly from here ?
+    PROXY_SECRET: str # TODO : can we generate SECRET directly from here ?
     HOST_DATA_PATH: Path
     DATA_PATH: Path = "/app/data"
     SQLALCHEMY_DATABASE_PATH: Path = "/app/data/database.db"
@@ -21,6 +21,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
+# TODO: check if HOST_DATA_PATH is valid (is not None + does path exist + is dir)
 # Ensure the data path exists
 settings.DATA_PATH.mkdir(parents=True, exist_ok=True)

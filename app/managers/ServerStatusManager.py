@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import websockets
 
 from app import logger
-from app.core import root_store
+from app.core import root_store, settings
 from app.events.miniverse_events import publish_miniverse_players_event
 from app.models import Miniverse
 from app.schemas import Player
@@ -48,7 +48,7 @@ class ServerStatusManager:
     def get_ws_connection(self, miniverse_id: str):
         headers = {"Authorization": f"Bearer {self.secrets[miniverse_id]}"}
         uri = uri_from_miniverse_id(miniverse_id)
-        return websockets.connect(uri, additional_headers=headers)
+        return websockets.connect(uri, additional_headers=headers, proxy=settings.PROXY_SOCKS)
 
     def add_miniverse(self, miniverse: Miniverse):
         miniverse_id = miniverse.id
@@ -70,7 +70,7 @@ class ServerStatusManager:
         return json.loads(await ws.recv()).get("result", [])
 
     async def _run_client(self, miniverse_id: str):
-        while True:
+        while True: # TODO: Never use while True, this code must timeout after 10min and check each loop if the container we want to connect still exist
             try:
                 async with self.get_ws_connection(miniverse_id) as ws:
                     self.reset_tries(miniverse_id)

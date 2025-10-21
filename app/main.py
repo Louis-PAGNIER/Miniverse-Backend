@@ -1,34 +1,28 @@
 import asyncio
 
 from docker.errors import NotFound
-from dotenv import load_dotenv
-
-load_dotenv()
-
-from app.api.v1.minecraft import MinecraftController
-from app.api.v1.websockets import websocket_miniverse_updates_handler
-from app.db.session import session_config
-from app.enums import Role
-from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
-from app.services.proxy_service import start_proxy_containers, update_proxy_config, stop_proxy_containers
-
-
 from litestar import Litestar
+from litestar.config.cors import CORSConfig
+from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import SwaggerRenderPlugin
-from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
-from litestar.config.cors import CORSConfig
 
-from app.db import Base
-from app.api.v1 import oauth2_auth, login
+from app import logger
 from app.api.v1 import UsersController, MiniversesController, ModsController
-
-from app.services.docker_service import dockerctl
-from app.managers.ServerStatusManager import server_status_manager
+from app.api.v1 import oauth2_auth, login
+from app.api.v1.minecraft import MinecraftController
+from app.api.v1.websockets import websocket_miniverse_updates_handler
 from app.core.channels import channels_plugin
-
+from app.db import Base
+from app.db.session import session_config
+from app.enums import Role
+from app.managers.ServerStatusManager import server_status_manager
 from app.schemas.user import UserCreate
+from app.services.docker_service import dockerctl
+from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
+from app.services.proxy_service import start_proxy_containers, update_proxy_config, stop_proxy_containers
 from app.services.user_service import get_user_by_username, create_user
+
 
 async def proxy_startup():
     async with session_config.get_session() as session:
@@ -76,7 +70,7 @@ async def docker_shutdown():
         try:
             await asyncio.gather(*tasks)
         except NotFound as e:
-            print(e)
+            logger.error(e)
 
 
 cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)

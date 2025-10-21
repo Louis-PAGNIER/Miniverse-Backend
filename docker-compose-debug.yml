@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  miniverse-api:
+    image: serjs/go-socks5-proxy
+    container_name: miniverse-api-proxy
+    ports:
+      - "1080:1080"
+    environment:
+      REQUIRE_AUTH: "false"
+    networks:
+      - miniverse-net
+      - redis-net
+    depends_on:
+      - redis
+    restart: unless-stopped
+    stop_grace_period: 2m
+
+  redis:
+    image: redis:8-alpine
+    container_name: miniverse-redis
+    command: [ "redis-server", "--loglevel", "warning" ]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - redis-net
+    restart: unless-stopped
+
+networks:
+  miniverse-net:
+    name: miniverse-net
+  redis-net:
+
+volumes:
+  redis-data:
+    driver: local

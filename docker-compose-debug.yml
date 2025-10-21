@@ -1,7 +1,7 @@
 version: "3.9"
 
 services:
-  miniverse-api:
+  miniverse-api-proxy:
     image: serjs/go-socks5-proxy
     container_name: miniverse-api-proxy
     ports:

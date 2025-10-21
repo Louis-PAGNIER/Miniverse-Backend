@@ -3,9 +3,11 @@ import asyncio
 from docker.errors import NotFound
 from litestar import Litestar
 from litestar.config.cors import CORSConfig
+from litestar.config.response_cache import ResponseCacheConfig
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import SwaggerRenderPlugin
+from litestar.types import HTTPScope
 
 from app import logger
 from app.api.v1 import UsersController, MiniversesController, ModsController
@@ -18,7 +20,6 @@ from app.db.session import session_config
 from app.enums import Role
 from app.managers.ServerStatusManager import server_status_manager
 from app.schemas.user import UserCreate
-from app.services.docker_service import dockerctl
 from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
 from app.services.proxy_service import start_proxy_containers, update_proxy_config, stop_proxy_containers
 from app.services.user_service import get_user_by_username, create_user
@@ -46,17 +47,18 @@ async def server_status_manager_startup():
     async with session_config.get_session() as session:
         miniverses = await get_miniverses(session)
         for miniverse in miniverses:
-            server_status_manager.add_miniverse(miniverse)
+            if miniverse.started:
+                server_status_manager.add_miniverse(miniverse)
 
 
 async def docker_startup():
-    await dockerctl.initialize()
     await start_proxy_containers()
     async with session_config.get_session() as session:
         miniverses = await get_miniverses(session)
         for miniverse in miniverses:
             if miniverse.started:
                 await start_miniverse(miniverse, session)
+
 
 async def docker_shutdown():
     async with session_config.get_session() as session:
@@ -73,13 +75,22 @@ async def docker_shutdown():
             logger.error(e)
 
 
-cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)
+def custom_cache_response_filter(_: HTTPScope, status_code: int) -> bool:
+    # Cache only 2xx responses
+    return 200 <= status_code < 300
+
+
+response_cache_config = ResponseCacheConfig(cache_response_filter=custom_cache_response_filter)
+
+cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)  # TODO: do cleaner CORS config
 
 app = Litestar(
     cors_config=cors_config,
-    route_handlers=[login, UsersController, MiniversesController, ModsController, MinecraftController, websocket_miniverse_updates_handler],
+    response_cache_config=response_cache_config,
+    route_handlers=[login, UsersController, MiniversesController, ModsController, MinecraftController,
+                    websocket_miniverse_updates_handler],
     on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
-    on_shutdown=[docker_shutdown],
+    on_shutdown=[docker_shutdown],  # TODO: Do we really need to shutdown all containers ?
     on_app_init=[oauth2_auth.on_app_init],
     openapi_config=OpenAPIConfig(
         title="Miniverse API",
@@ -101,4 +112,3 @@ app = Litestar(
     ),
     plugins=[SQLAlchemyPlugin(config=session_config), channels_plugin],
 )
-

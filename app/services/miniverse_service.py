@@ -27,13 +27,16 @@ def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -
         return settings.HOST_DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
     return settings.DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
 
+
 async def get_miniverses(db: AsyncSession) -> list[Miniverse]:
     result = await db.execute(select(Miniverse))
     return list(result.scalars().all())
 
+
 async def get_miniverse(miniverse_id: str, db: AsyncSession) -> Miniverse | None:
     result = await db.execute(select(Miniverse).where(Miniverse.id == miniverse_id))
     return result.scalars().first()
+
 
 async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncSession) -> Miniverse:
     db_miniverse = Miniverse(
@@ -112,6 +115,7 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
             "MANAGEMENT_SERVER_TLS_ENABLED": "FALSE",
             "MANAGEMENT_SERVER_HOST": "0.0.0.0",
             "MANAGEMENT_SERVER_PORT": "25585",
+            # TODO: Add query port to ensure a way to detect online status of minecraft server without websocket
             "MANAGEMENT_SERVER_SECRET": miniverse.management_server_secret,
         },
         tty=True,
@@ -126,6 +130,8 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
     return container
 
 
+# TODO: Call this function each time the server start to ensure Proxy mod is installed (without the server can't be accessed)
+# TODO: So we must add already installed checks
 async def init_data_path(miniverse: Miniverse, db: AsyncSession):
     volume_data_path = get_miniverse_path(miniverse.id, "data")
     game_version = miniverse.mc_version
@@ -137,16 +143,18 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
         config_path.mkdir(parents=True, exist_ok=True)
 
         if miniverse.type == MiniverseType.FABRIC:
-            await automatic_mod_install("P7dR8mSH", miniverse, db, prioritize_release=prioritize_release) # Fabric API
-            await automatic_mod_install("8dI2tmqs", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
+            await automatic_mod_install("P7dR8mSH", miniverse, db, prioritize_release=prioritize_release)  # Fabric API
+            await automatic_mod_install("8dI2tmqs", miniverse, db, prioritize_release=prioritize_release,
+                                        retry_with_latest=True)  # FabricProxy-Lite
             fabric_proxy_lite_config = config_path / "FabricProxy-Lite.toml"
             with open(str(fabric_proxy_lite_config), "w") as f:
                 toml.dump({"secret": settings.PROXY_SECRET}, f)
         elif miniverse.type == MiniverseType.NEO_FORGE or miniverse.type == MiniverseType.FORGE:
-            await automatic_mod_install("vDyrHl8l", miniverse, db, prioritize_release=prioritize_release, retry_with_latest=True) # FabricProxy-Lite
+            await automatic_mod_install("vDyrHl8l", miniverse, db, prioritize_release=prioritize_release,
+                                        retry_with_latest=True)  # FabricProxy-Lite
             fabric_proxy_lite_config = config_path / "pcf-common.toml"
             with open(str(fabric_proxy_lite_config), "w") as f:
-                toml.dump({"modernForwarding": { "forwardingSecret": settings.PROXY_SECRET } }, f)
+                toml.dump({"modernForwarding": {"forwardingSecret": settings.PROXY_SECRET}}, f)
         else:
             logger.warning(f"Miniverse type {miniverse.type} is currently not supported for standalone miniverses.")
 
@@ -202,7 +210,8 @@ async def restart_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
     return await start_miniverse(miniverse, db)
 
 
-async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncSession, force_update: bool = False) -> Miniverse:
+async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncSession,
+                           force_update: bool = False) -> Miniverse:
     if miniverse.mc_version == new_mc_version:
         raise ValidationException("The new Minecraft version is the same as the current one.")
 
@@ -210,6 +219,7 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
     if version_comparison is None:
         raise ValidationException("The specified Minecraft versions is invalid.")
     if version_comparison > 0:
+        # TODO: Support this
         raise ValidationException("Downgrading Minecraft versions is not supported.")
 
     if miniverse.type in [MiniverseType.FORGE, MiniverseType.NEO_FORGE, MiniverseType.FABRIC]:
@@ -220,10 +230,12 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
         for mod_id, update_info in possible_mod_updates.items():
             if update_info.update_status in [ModUpdateStatus.ERROR, ModUpdateStatus.NO_COMPATIBLE_VERSIONS]:
                 safe_update = False
-                logger.warning(f"Mod {mod_id} cannot be updated to be compatible with Minecraft {new_mc_version}: {update_info.update_status}")
+                logger.warning(
+                    f"Mod {mod_id} cannot be updated to be compatible with Minecraft {new_mc_version}: {update_info.update_status}")
 
-        if not safe_update or force_update:
-            raise ValidationException("One or more mods cannot be updated to be compatible with the specified Minecraft version.")
+        if not safe_update and not force_update:
+            raise ValidationException(
+                "One or more mods cannot be updated to be compatible with the specified Minecraft version.")
 
         for mod in miniverse.mods:
             update_info = possible_mod_updates[mod.id]

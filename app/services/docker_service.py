@@ -1,10 +1,8 @@
 import asyncio
-import docker
-
-from app import logger
-from app.core import settings
 from dataclasses import dataclass
 from typing import Any, Literal
+
+import docker
 from docker.errors import ImageNotFound
 
 
@@ -14,25 +12,9 @@ class VolumeConfig:
     mode: Literal["ro", "rw"] = "rw"
 
 
-class AsyncNetworkController:
-    def __init__(self, client: docker.DockerClient):
-        self.client = client
-
-    async def list_networks(self) -> list[dict[str, Any]]:
-        return await asyncio.to_thread(
-            lambda: [n.attrs for n in self.client.networks.list()]
-        )
-
-    async def create_network(self, name: str, driver: str = "bridge", **kwargs) -> dict[str, Any]:
-        return await asyncio.to_thread(
-            lambda: self.client.networks.create(name, driver=driver, **kwargs).attrs
-        )
-
-
 class AsyncDockerController:
     def __init__(self):
         self.client = docker.from_env()
-        self.networks = AsyncNetworkController(self.client)
 
     async def list_containers(self, all: bool = True) -> list[dict[str, Any]]:
         return await asyncio.to_thread(
@@ -49,20 +31,19 @@ class AsyncDockerController:
         return {cid: stats for cid, stats in results}
 
     async def create_container(
-        self,
-        image: str,
-        *,
-        name: str = None,
-        command: str = None,
-        detach: bool = True,
-        network_id: str = None,
-        volumes: dict[str, VolumeConfig] = None,
-        ports: dict[str, int | list[int]] = None,
-        tty: bool = False,
-        stdin_open: bool = False,
-        environment: dict[str, str] = None,
-        auto_remove: bool = False,
-        **kwargs
+            self,
+            image: str,
+            *,
+            name: str = None,
+            command: str = None,
+            network_id: str = None,
+            volumes: dict[str, VolumeConfig] = None,
+            ports: dict[str, int | list[int]] = None,
+            tty: bool = False,
+            stdin_open: bool = False,
+            environment: dict[str, str] = None,
+            auto_remove: bool = False,
+            **kwargs
     ) -> dict[str, Any]:
         def _create():
             try:
@@ -80,7 +61,6 @@ class AsyncDockerController:
                 image,
                 name=name,
                 command=command,
-                detach=detach,
                 network=network_id,
                 volumes=volumes_dict,
                 ports=ports,
@@ -116,6 +96,7 @@ class AsyncDockerController:
                 container.remove(force=True)
             except docker.errors.NotFound:
                 pass
+
         return await asyncio.to_thread(_remove)
 
     async def get_container(self, container_id: str) -> dict[str, Any]:
@@ -125,6 +106,7 @@ class AsyncDockerController:
                 return container.attrs
             except docker.errors.NotFound:
                 return None
+
         return await asyncio.to_thread(_get)
 
     async def get_container_by_name(self, name: str) -> dict[str, Any] | None:
@@ -133,13 +115,8 @@ class AsyncDockerController:
             if containers:
                 return containers[0].attrs
             return None
+
         return await asyncio.to_thread(_get)
 
-    async def initialize(self):
-        networks = await self.networks.list_networks()
-        if not any(n["Name"] == settings.DOCKER_NETWORK_NAME for n in networks):
-            logger.info(f"{settings.DOCKER_NETWORK_NAME} network not found, creating...")
-            await self.networks.create_network(settings.DOCKER_NETWORK_NAME)
 
 dockerctl = AsyncDockerController()
-

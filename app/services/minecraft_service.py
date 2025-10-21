@@ -1,10 +1,12 @@
-import httpx
 import re
 
-from app.services.mods_service import MODRINTH_BASE_URL
+import httpx
+
 from app.schemas.minecraft import MinecraftVersion
+from app.services.mods_service import MODRINTH_BASE_URL
 
 
+# TODO: Add cache on this function
 async def get_minecraft_versions() -> list[MinecraftVersion]:
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{MODRINTH_BASE_URL}/tag/game_version")
@@ -15,14 +17,18 @@ async def get_minecraft_versions() -> list[MinecraftVersion]:
         ]
         return versions
 
+
 def is_snapshot(game_version: str) -> bool:
     return re.match(r"^\d{2}w\d{2}[a-z]$", game_version) is not None
+
 
 def is_prerelease(game_version: str) -> bool:
     return re.match(r"^\d{1,2}\.\d{1,2}\.\d{1,2}-(pre|rc)\d*$", game_version) is not None
 
+
 def is_release(game_version: str) -> bool:
     return re.match(r"^\d{1,2}\.\d{1,2}\.\d{1,2}$", game_version) is not None
+
 
 def get_version_type(game_version: str) -> str | None:
     if is_snapshot(game_version):
@@ -34,6 +40,7 @@ def get_version_type(game_version: str) -> str | None:
     else:
         return None
 
+
 def compare_main_versions(major1, minor1, patch1, major2, minor2, patch2) -> int:
     if major1 != major2:
         return (major1 > major2) - (major1 < major2)
@@ -43,12 +50,13 @@ def compare_main_versions(major1, minor1, patch1, major2, minor2, patch2) -> int
         return (patch1 > patch2) - (patch1 < patch2)
     return 0
 
+
 def compare_prerelease_identifiers(id1: str, id2: str) -> int:
     if id1 == id2:
         return 0
 
-    id1_regex= re.match(r"^(pre|rc)(\d+)$", id1)
-    id2_regex= re.match(r"^(pre|rc)(\d+)$", id2)
+    id1_regex = re.match(r"^(pre|rc)(\d+)$", id1)
+    id2_regex = re.match(r"^(pre|rc)(\d+)$", id2)
 
     id1_rc = id1_regex.group(1) == "rc"
     id2_rc = id2_regex.group(1) == "rc"
@@ -59,6 +67,7 @@ def compare_prerelease_identifiers(id1: str, id2: str) -> int:
     if id1_rc != id2_rc:
         return (id1_rc > id2_rc) - (id1_rc < id2_rc)
     return int(id1_value) - int(id2_value)
+
 
 async def compare_by_publish_date(v1: str, v2: str) -> int | None:
     # Fallback comparison by publish date if one of versions is a snapshot because we can't compare them directly

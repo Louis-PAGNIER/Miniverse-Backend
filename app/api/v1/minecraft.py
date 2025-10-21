@@ -4,11 +4,12 @@ from litestar.exceptions import NotFoundException
 from app.schemas.minecraft import MinecraftVersion
 from app.services.minecraft_service import get_minecraft_versions
 
+
 class MinecraftController(Controller):
     path = "/api/minecraft"
     tags = ["Minecraft"]
 
-    @get('/versions')
+    @get('/versions', cache=600)
     async def list_minecraft_versions(self, min_version: str = None) -> list[MinecraftVersion]:
         all_versions = await get_minecraft_versions()
         if min_version is None:

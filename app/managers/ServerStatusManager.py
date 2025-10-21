@@ -1,23 +1,17 @@
 import asyncio
 import json
-from dataclasses import dataclass
 
+import rich
 import websockets
 
 from app import logger
 from app.core import root_store, settings
+from app.core.utils import websocket_uri_from_miniverse_id
 from app.events.miniverse_events import publish_miniverse_players_event
 from app.models import Miniverse
 from app.schemas import Player
 
 server_status_store = root_store.with_namespace("server-status")
-
-@dataclass
-class ManagementServerEvent:
-    method: str
-
-def uri_from_miniverse_id(miniverse_id: str) -> str:
-    return f"ws://miniverse-{miniverse_id}:25585"
 
 class ServerStatusManager:
     def __init__(self):
@@ -41,13 +35,13 @@ class ServerStatusManager:
             self.reset_tries(miniverse_id)
         self.tries[miniverse_id] += 1
         tries = self.tries[miniverse_id]
-        timeout = next((t for (s, t) in thresholds if tries > s))
+        timeout = next(t for (s, t) in thresholds if tries > s)
         self.timeouts[miniverse_id] = timeout
         return timeout
 
     def get_ws_connection(self, miniverse_id: str):
         headers = {"Authorization": f"Bearer {self.secrets[miniverse_id]}"}
-        uri = uri_from_miniverse_id(miniverse_id)
+        uri = websocket_uri_from_miniverse_id(miniverse_id)
         return websockets.connect(uri, additional_headers=headers, proxy=settings.PROXY_SOCKS)
 
     def add_miniverse(self, miniverse: Miniverse):
@@ -117,7 +111,8 @@ class ServerStatusManager:
             logger.info(f"Miniverse {miniverse_id} is stopping...")
 
         else:
-            # rich.print_json(data=data) # For debugging purposes
+            logger.info(f"Miniverse {miniverse_id} said :")
+            rich.print_json(data=data)  # For debugging purposes
             pass
 
 

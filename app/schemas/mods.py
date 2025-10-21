@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Optional, Literal
 
 
+# TODO: ça exit un décorateur qui fait auto le from_dict ?
+
 class ModrinthProjectType(enum.Enum):
     MOD = "mod"
     MODPACK = "modpack"
@@ -11,16 +13,19 @@ class ModrinthProjectType(enum.Enum):
     SHADER = "shader"
     WORLD = "world"
 
+
 class ModSideSupport(enum.Enum):
     REQUIRED = "required"
     OPTIONAL = "optional"
     UNSUPPORTED = "unsupported"
     UNKNOWN = "unknown"
 
+
 class ModVersionType(enum.Enum):
     RELEASE = "release"
     BETA = "beta"
     ALPHA = "alpha"
+
 
 class ModUpdateStatus(enum.Enum):
     ALREADY_UP_TO_DATE = "already_up_to_date"
@@ -28,11 +33,13 @@ class ModUpdateStatus(enum.Enum):
     NO_COMPATIBLE_VERSIONS = "no_compatible_versions"
     ERROR = "error"
 
+
 @dataclass
 class ModUpdateInfo:
     update_status: ModUpdateStatus
     new_versions_ids: list[str]
     game_versions: list[list[str]]  # list of compatible game versions for each new version
+
 
 # ================== Modrinth API Schemas ================== #
 @dataclass
@@ -42,6 +49,7 @@ class ModrinthSearchFacets:
     versions: list[str] = None
     client_side: ModSideSupport = None
     server_side: ModSideSupport = None
+
 
 @dataclass
 class ModrinthSearchResult:
@@ -92,6 +100,7 @@ class ModrinthSearchResult:
             color=data["color"],
             featured_gallery=data.get("featured_gallery"),
         )
+
 
 @dataclass
 class ModrinthProject:
@@ -166,6 +175,7 @@ class ModrinthSearchResults:
             total_hits=data["total_hits"],
         )
 
+
 @dataclass
 class ModrinthFileHashes:
     sha1: str
@@ -174,6 +184,7 @@ class ModrinthFileHashes:
     @staticmethod
     def from_dict(data: dict) -> "ModrinthFileHashes":
         return ModrinthFileHashes(**data)
+
 
 @dataclass
 class ModrinthProjectFile:
@@ -194,6 +205,7 @@ class ModrinthProjectFile:
             size=data["size"],
             file_type=data.get("file_type"),
         )
+
 
 @dataclass
 class ModrinthProjectVersion:

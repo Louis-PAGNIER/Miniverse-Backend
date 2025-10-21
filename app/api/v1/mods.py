@@ -22,8 +22,9 @@ class ModsController(Controller):
         "current_user": Provide(get_current_user),
     }
 
-    @get("/search")
-    async def search_mods(self, query_search: Annotated[str, Parameter(query="query")], limit: int = 20, offset: int = 0) -> ModrinthSearchResults:
+    @get("/search", cache=600)
+    async def search_mods(self, query_search: Annotated[str, Parameter(query="query")], limit: int = 20,
+                          offset: int = 0) -> ModrinthSearchResults:
         return await search_modrinth_projects(
             query_search,
             facets=ModrinthSearchFacets(
@@ -33,21 +34,23 @@ class ModsController(Controller):
             offset=offset
         )
 
-    @get("{project_id:str}/details")
+    @get("{project_id:str}/details", cache=600)
     async def get_mod_details(self, project_id: str) -> ModrinthProject:
         return await get_project_details(project_id)
 
-    @get("{version_id:str}/details/version")
+    @get("{version_id:str}/details/version", cache=600)
     async def get_mod_version_details(self, version_id: str) -> ModrinthProjectVersion:
         return await get_version_details(version_id)
 
-    @get("{project_id:str}/versions")
-    async def list_mod_versions(self, project_id: str, loader: str | None, game_version: str | None) -> list[ModrinthProjectVersion]:
+    @get("{project_id:str}/versions", cache=600)
+    async def list_mod_versions(self, project_id: str, loader: str | None, game_version: str | None) -> list[
+        ModrinthProjectVersion]:
         if loader is None:
             _loader = None
         else:
             try:
                 _loader = MiniverseType(loader)
             except ValueError:
-                raise ValidationException(f"Invalid loader: {loader}. Must be one of {[e.value for e in MiniverseType]}")
+                raise ValidationException(
+                    f"Invalid loader: {loader}. Must be one of {[e.value for e in MiniverseType]}")
         return await list_project_versions(project_id, _loader, game_version)

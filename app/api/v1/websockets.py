@@ -15,16 +15,16 @@ async def handle_miniverse_channel_message(socket: WebSocket, message: bytes) ->
     if miniverse_id is None or socket.user.get_miniverse_role(miniverse_id) >= Role.USER:
         await socket.send_json(data)
 
+
 @websocket("/ws/miniverse")
 async def websocket_miniverse_updates_handler(socket: WebSocket, channels: ChannelsPlugin) -> None:
     await socket.accept()
     try:
         async with channels.start_subscription(["miniverse-updates"]) as subscriber, subscriber.run_in_background(
-            lambda msg: handle_miniverse_channel_message(socket, msg)
+                lambda msg: handle_miniverse_channel_message(socket, msg)
         ):
-            while True:
-                response = await socket.receive_text()
-                print(response)
+            while (response := await socket.receive_text()) is not None:
+                print(response)  # TODO: Future usage
     except (WebSocketDisconnect, ConnectionClosedError):
         pass
     except Exception as e:

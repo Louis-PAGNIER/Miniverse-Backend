@@ -79,9 +79,16 @@ class ServerStatusManager:
                     await server_status_store.set(f"{miniverse_id}.players", json.dumps(players_list))
                     publish_miniverse_players_event(miniverse_id, players_list)
 
-                    async for message in ws:
-                        data = json.loads(message)
-                        await self.handle_management_server_event(miniverse_id, data)
+                    # TODO refractor the code below in a separate method
+                    try:
+                        async for message in ws:
+                            data = json.loads(message)
+                            await self.handle_management_server_event(miniverse_id, data)
+                    except websockets.exceptions.ConnectionClosed:
+                        return
+                    except Exception as e:
+                        print(e) # This should never happen, this is to display strange behaviors
+                        exit(1)
             except Exception as e:
                 timeout = self.get_next_timeout_and_increment(miniverse_id)
                 await asyncio.sleep(timeout)

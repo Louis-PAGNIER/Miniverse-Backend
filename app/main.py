@@ -1,6 +1,9 @@
 import asyncio
 
+from docker.errors import NotFound
 from dotenv import load_dotenv
+
+load_dotenv()
 
 from app.api.v1.minecraft import MinecraftController
 from app.api.v1.websockets import websocket_miniverse_updates_handler
@@ -9,7 +12,6 @@ from app.enums import Role
 from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
 from app.services.proxy_service import start_proxy_containers, update_proxy_config, stop_proxy_containers
 
-load_dotenv()
 
 from litestar import Litestar
 from litestar.openapi import OpenAPIConfig

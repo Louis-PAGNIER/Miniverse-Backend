@@ -1,12 +1,13 @@
+import shutil
 from pathlib import Path
 
+import toml
 from litestar.exceptions import ValidationException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.core import settings
-from app.core.config import DATA_PATH
 from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
 from app.events.miniverse_events import publish_miniverse_deleted_event, publish_miniverse_created_event, \
@@ -16,19 +17,15 @@ from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas import ModUpdateStatus
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
-
-import shutil
-import toml
-
 from app.services.minecraft_service import is_release, compare_versions
-from app.services.proxy_service import update_proxy_config
 from app.services.mods_service import automatic_mod_install, list_possible_mod_updates, update_mod
+from app.services.proxy_service import update_proxy_config
 
 
 def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -> Path:
     if from_host:
-        return Path(settings.HOST_DATA_PATH) / "miniverses" / proxy_id / Path(*subpaths)
-    return DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
+        return settings.HOST_DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
+    return settings.DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
 
 async def get_miniverses(db: AsyncSession) -> list[Miniverse]:
     result = await db.execute(select(Miniverse))

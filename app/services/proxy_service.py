@@ -1,14 +1,9 @@
-from pathlib import Path
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.utils import write_yaml_safe
 from app.models import Miniverse
-from app.core.config import settings, DATA_PATH
-
-import yaml
-
 from app.services.docker_service import dockerctl, VolumeConfig
 
 
@@ -84,10 +79,10 @@ async def update_proxy_config(db: AsyncSession) -> None:
     miniverse_list = list(miniverses.scalars().all())
 
     main_proxy_config = generate_main_proxy_config([miniverse for miniverse in miniverse_list if miniverse.is_on_lite_proxy])
-    main_proxy_config_path = DATA_PATH / "proxy" / "configs" / "config-main.yml"
+    main_proxy_config_path = settings.DATA_PATH / "proxy" / "configs" / "config-main.yml"
 
     classic_proxy_config = generate_classic_proxy_config([miniverse for miniverse in miniverse_list if not miniverse.is_on_lite_proxy])
-    classic_proxy_config_path = DATA_PATH / "proxy" / "configs" /"config-classic.yml"
+    classic_proxy_config_path = settings.DATA_PATH / "proxy" / "configs" /"config-classic.yml"
 
     main_proxy_config_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -96,8 +91,8 @@ async def update_proxy_config(db: AsyncSession) -> None:
 
 
 async def start_proxy_containers() -> None:
-    main_proxy_config_path = Path(settings.HOST_DATA_PATH) / "proxy" / "configs" /"config-main.yml"
-    classic_proxy_config_path = Path(settings.HOST_DATA_PATH) / "proxy" / "configs" /"config-classic.yml"
+    main_proxy_config_path = settings.HOST_DATA_PATH / "proxy" / "configs" /"config-main.yml"
+    classic_proxy_config_path = settings.HOST_DATA_PATH / "proxy" / "configs" /"config-classic.yml"
 
     main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
     if main_container is None:

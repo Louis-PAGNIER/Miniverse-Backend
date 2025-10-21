@@ -73,7 +73,11 @@ async def docker_shutdown():
             for miniverse in miniverses
         ]
         tasks.append(stop_proxy_containers())
-        await asyncio.gather(*tasks)
+        try:
+            await asyncio.gather(*tasks)
+        except NotFound as e:
+            print(e)
+
 
 cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)
 

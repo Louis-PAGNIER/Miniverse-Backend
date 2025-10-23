@@ -2,26 +2,41 @@ import json
 
 from litestar import websocket, WebSocket
 from litestar.channels import ChannelsPlugin
+from litestar.di import Provide
 from litestar.exceptions import WebSocketDisconnect
+from sqlalchemy.ext.asyncio import AsyncSession
 from websockets import ConnectionClosedError
 
+from app import get_db_session
 from app.enums import Role
+from app.services.user_service import get_user
 
 
-async def handle_miniverse_channel_message(socket: WebSocket, message: bytes) -> None:
+async def handle_miniverse_channel_message(socket: WebSocket, message: bytes, db: AsyncSession) -> None:
     data = json.loads(message)
     miniverse_id = data.get("miniverse-id")
+    event_type = data.get("type")
 
-    if miniverse_id is None or socket.user.get_miniverse_role(miniverse_id) >= Role.USER:
+    if event_type == "deleted":
+        await socket.send_json(data)
+        return
+
+    if event_type in ["created", "updated"]:
+        user = await get_user(socket.user.id, db)
+    else:
+        # For other events, we assume the user info is still valid
+        user = socket.user  # type: ignore
+
+    if miniverse_id is None or user.get_miniverse_role(miniverse_id) >= Role.USER:
         await socket.send_json(data)
 
 
-@websocket("/ws/miniverse")
-async def websocket_miniverse_updates_handler(socket: WebSocket, channels: ChannelsPlugin) -> None:
+@websocket("/ws/miniverse", dependencies={"db": Provide(get_db_session)})
+async def websocket_miniverse_updates_handler(socket: WebSocket, channels: ChannelsPlugin, db: AsyncSession) -> None:
     await socket.accept()
     try:
         async with channels.start_subscription(["miniverse-updates"]) as subscriber, subscriber.run_in_background(
-                lambda msg: handle_miniverse_channel_message(socket, msg)
+                lambda msg: handle_miniverse_channel_message(socket, msg, db)
         ):
             while (response := await socket.receive_text()) is not None:
                 print(response)  # TODO: Future usage

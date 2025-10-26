@@ -13,7 +13,7 @@ from app import logger
 from app.api.v1 import UsersController, MiniversesController, ModsController
 from app.api.v1 import oauth2_auth, login
 from app.api.v1.minecraft import MinecraftController
-from app.api.v1.websockets import websocket_miniverse_updates_handler
+from app.api.v1.websockets import websocket_miniverse_updates_handler, websocket_miniverse_logs_handler
 from app.core.channels import channels_plugin
 from app.db import Base
 from app.db.session import session_config
@@ -88,7 +88,7 @@ app = Litestar(
     cors_config=cors_config,
     response_cache_config=response_cache_config,
     route_handlers=[login, UsersController, MiniversesController, ModsController, MinecraftController,
-                    websocket_miniverse_updates_handler],
+                    websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
     on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
     on_shutdown=[docker_shutdown],  # TODO: Do we really need to shutdown all containers ?
     on_app_init=[oauth2_auth.on_app_init],

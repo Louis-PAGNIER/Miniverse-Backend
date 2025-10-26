@@ -5,7 +5,6 @@ from typing import Any, Literal, Generator
 import docker
 import aiodocker
 from docker.errors import ImageNotFound
-from rich.ansi import stdout
 
 
 @dataclass
@@ -17,7 +16,13 @@ class VolumeConfig:
 class AsyncDockerController:
     def __init__(self):
         self.client = docker.from_env()
-        self.aioclient = aiodocker.Docker()
+        self._aioclient = None
+
+    @property
+    def aioclient(self):
+        if not self._aioclient:
+            self._aioclient = aiodocker.Docker()
+        return self._aioclient
 
     async def list_containers(self, all: bool = True) -> list[dict[str, Any]]:
         return await asyncio.to_thread(
@@ -122,7 +127,7 @@ class AsyncDockerController:
         return await asyncio.to_thread(_get)
 
     async def get_container_logs_generator(self, container_id: str):
-        container = self.aioclient.containers.get(container_id)
+        container = await self.aioclient.containers.get(container_id)
         async for chunk in container.log(follow=True, stdout=True):
             yield chunk
 

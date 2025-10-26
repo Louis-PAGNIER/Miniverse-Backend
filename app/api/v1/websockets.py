@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from websockets import ConnectionClosedError
 
 from app import get_db_session
+from app.core import settings
 from app.enums import Role
 from app.models import User
 from app.services.docker_service import dockerctl
 from app.services.miniverse_service import get_miniverse
 from app.services.user_service import get_user
+
 
 # TODO: move in a more general file
 @dataclass
@@ -30,9 +32,11 @@ async def handle_miniverse_channel_message(message: bytes, socket: WebSocket, db
         await socket.send_json(data)
         return
 
-    if event_type in ["created", "updated"]:
-        ctx.user = await get_user(socket.user.id, db)
+    if event_type in ["created", "updated"]:  # TODO: Define an enum with all possible states instead of using strings
+        ctx.user = await get_user(socket.user.id,
+                                  db)  # TODO: Remove this call entirely by passing all user context in event message
 
+    # TODO: ctx.user should be updated if user context is passed in the event message
     if miniverse_id is None or ctx.user.get_miniverse_role(miniverse_id) >= Role.USER:
         await socket.send_json(data)
 
@@ -42,7 +46,8 @@ async def websocket_miniverse_updates_handler(socket: WebSocket, channels: Chann
     await socket.accept()
     ctx = WebsocketContext(socket.user)
     try:
-        async with channels.start_subscription(["miniverse-updates"]) as subscriber, subscriber.run_in_background(
+        async with channels.start_subscription(
+                [settings.REDIS_CHANNEL_NAME]) as subscriber, subscriber.run_in_background(
                 lambda msg: handle_miniverse_channel_message(msg, socket, db, ctx)
         ):
             while (response := await socket.receive_text()) is not None:

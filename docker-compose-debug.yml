@@ -1,11 +1,9 @@
-version: "3.9"
-
 services:
   miniverse-api-proxy:
     image: serjs/go-socks5-proxy
     container_name: miniverse-api-proxy
     ports:
-      - "1080:1080"
+      - "127.0.0.1:1080:1080"
     environment:
       REQUIRE_AUTH: "false"
     networks:
@@ -21,7 +19,7 @@ services:
     container_name: miniverse-redis
     command: [ "redis-server", "--loglevel", "warning" ]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     networks:

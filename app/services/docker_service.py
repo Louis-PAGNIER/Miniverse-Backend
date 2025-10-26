@@ -1,9 +1,9 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Literal, Generator
+from typing import Any, Literal
 
-import docker
 import aiodocker
+import docker
 from docker.errors import ImageNotFound
 
 
@@ -20,7 +20,7 @@ class AsyncDockerController:
 
     @property
     def aioclient(self):
-        if not self._aioclient:
+        if self._aioclient is None:
             self._aioclient = aiodocker.Docker()
         return self._aioclient
 
@@ -130,5 +130,6 @@ class AsyncDockerController:
         container = await self.aioclient.containers.get(container_id)
         async for chunk in container.log(follow=True, stdout=True):
             yield chunk
+
 
 dockerctl = AsyncDockerController()

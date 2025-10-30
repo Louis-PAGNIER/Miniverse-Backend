@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.enums import MiniverseType
-from app.events.miniverse_events import publish_miniverse_updated_event
+from app.events.miniverse_event import publish_miniverse_updated_event
 from app.models import Miniverse, Mod
 from app.schemas import ModVersionType
 from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, ModrinthProjectVersion, ModrinthProject, \

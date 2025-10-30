@@ -10,7 +10,7 @@ from app import logger
 from app.core import settings
 from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
-from app.events.miniverse_events import publish_miniverse_deleted_event, publish_miniverse_created_event, \
+from app.events.miniverse_event import publish_miniverse_deleted_event, publish_miniverse_created_event, \
     publish_miniverse_updated_event
 from app.managers import server_status_manager
 from app.models import Miniverse, MiniverseUserRole, User
@@ -69,7 +69,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
     await start_miniverse(db_miniverse, db)
     await update_proxy_config(db)
 
-    publish_miniverse_created_event(db_miniverse.id)
+    publish_miniverse_created_event(db_miniverse.id, db_miniverse.users_roles)
 
     return db_miniverse
 

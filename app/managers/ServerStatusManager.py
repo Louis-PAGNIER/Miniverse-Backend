@@ -7,7 +7,7 @@ import websockets
 from app import logger
 from app.core import root_store, settings
 from app.core.utils import websocket_uri_from_miniverse_id
-from app.events.miniverse_events import publish_miniverse_players_event
+from app.events.miniverse_event import publish_miniverse_players_event
 from app.models import Miniverse
 from app.schemas import Player
 

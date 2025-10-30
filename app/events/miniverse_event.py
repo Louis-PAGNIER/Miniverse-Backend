@@ -36,26 +36,28 @@ def publish_miniverse_players_event(miniverse_id: str, players: list[Player]) ->
         settings.REDIS_CHANNEL_NAME)
 
 
-def publish_miniverse_created_event(miniverse_id: str, updated_users: list[MiniverseUserRole]) -> None:
+def publish_miniverse_created_event(miniverse_id: str, updated_user_ids: list[str]) -> None:
     channels_plugin.publish(MiniverseEvent(
         type=EventType.CREATED,
         miniverse_id=miniverse_id,
         data={},
-        updated_user_ids=user_list_from_user_role_list(updated_users)),
+        updated_user_ids=updated_user_ids),
         settings.REDIS_CHANNEL_NAME)
 
 
-def publish_miniverse_deleted_event(miniverse_id: str) -> None:
+def publish_miniverse_deleted_event(miniverse_id: str, updated_user_ids: list[str]) -> None:
     channels_plugin.publish(MiniverseEvent(
         type=EventType.DELETED,
         miniverse_id=miniverse_id,
-        data={}),
+        data={},
+        updated_user_ids=updated_user_ids),
         settings.REDIS_CHANNEL_NAME)
 
 
-def publish_miniverse_updated_event(miniverse_id: str) -> None:
+def publish_miniverse_updated_event(miniverse_id: str, updated_user_ids: list[str] | None = None) -> None:
     channels_plugin.publish(MiniverseEvent(
         type=EventType.UPDATED,
         miniverse_id=miniverse_id,
-        data={}),
+        data={},
+        updated_user_ids=updated_user_ids),
         settings.REDIS_CHANNEL_NAME)

@@ -11,7 +11,7 @@ from app.core import settings
 from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
 from app.events.miniverse_event import publish_miniverse_deleted_event, publish_miniverse_created_event, \
-    publish_miniverse_updated_event
+    publish_miniverse_updated_event, user_list_from_user_role_list
 from app.managers import server_status_manager
 from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas import ModUpdateStatus
@@ -69,7 +69,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
     await start_miniverse(db_miniverse, db)
     await update_proxy_config(db)
 
-    publish_miniverse_created_event(db_miniverse.id, db_miniverse.users_roles)
+    publish_miniverse_created_event(db_miniverse.id, user_list_from_user_role_list(db_miniverse.users_roles))
 
     return db_miniverse
 
@@ -90,7 +90,7 @@ async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
     await db.commit()
     await update_proxy_config(db)
 
-    publish_miniverse_deleted_event(miniverse_id)
+    publish_miniverse_deleted_event(miniverse_id, user_list_from_user_role_list(miniverse.users_roles))
 
 
 async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> dict:

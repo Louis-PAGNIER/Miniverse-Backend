@@ -30,8 +30,6 @@ async def handle_miniverse_channel_message(message: bytes,
                                            ctx: WebsocketContext) -> None:
     event = MiniverseEvent.from_bytes(message)
 
-    # TODO: this solution is should be better than before but does not fix performances issues
-    # TODO: event publishers should send a list of users that event handler will send to (users perms checks should be done in the event caller instead of in the event handler)
     if event.updated_user_ids is not None and ctx.user.id in event.updated_user_ids:
         ctx.user = await get_user(socket.user.id, db)
 

@@ -19,6 +19,13 @@ services:
       - redis
     restart: unless-stopped
     stop_grace_period: 2m
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./app
+          target: /app/app
+        - action: rebuild
+          path: poetry.lock
 
   redis:
     image: redis:8-alpine

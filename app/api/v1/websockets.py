@@ -18,7 +18,6 @@ from app.services.miniverse_service import get_miniverse
 from app.services.user_service import get_user
 
 
-# TODO: move in a more general file
 @dataclass
 class WebsocketContext:
     user: User
@@ -52,7 +51,8 @@ async def websocket_miniverse_updates_handler(socket: WebSocket, channels: Chann
             lambda msg: handle_miniverse_channel_message(msg, socket, db, ctx)
         ):
             while (response := await socket.receive_text()) is not None:
-                print(response)  # TODO: Future usage
+                print(response)
+                raise NotImplementedError("Server does not implement this method")
     except (WebSocketDisconnect, ConnectionClosedError):
         pass
     except Exception as e:

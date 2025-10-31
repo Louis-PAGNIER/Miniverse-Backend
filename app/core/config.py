@@ -16,9 +16,6 @@ class Settings(BaseSettings):
     REDIS_HOST_NAME: str = "miniverse-redis"
     REDIS_CHANNEL_NAME: str = "miniverse-updates"
 
-    class Config:
-        env_file = ".env"
-
 
 settings = Settings()
 # TODO: check if HOST_DATA_PATH is valid (is not None + does path exist + is dir)

@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 
 from litestar import websocket, WebSocket
@@ -7,7 +8,7 @@ from litestar.exceptions import WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from websockets import ConnectionClosedError
 
-from app import get_db_session
+from app import get_db_session, logger
 from app.core import settings
 from app.enums import Role
 from app.enums.event_type import EventType
@@ -62,14 +63,33 @@ async def websocket_miniverse_updates_handler(socket: WebSocket, channels: Chann
 @websocket("/ws/miniverse/logs/{miniverse_id:str}", dependencies={"db": Provide(get_db_session)})
 async def websocket_miniverse_logs_handler(miniverse_id: str, socket: WebSocket, db: AsyncSession) -> None:
     await socket.accept()
-    try:
-        miniverse = await get_miniverse(miniverse_id, db)
-        user = await get_user(socket.user.id, db)
-        # if user.get_miniverse_role(miniverse_id) >= Role.MODERATOR:
+    miniverse = await get_miniverse(miniverse_id, db)
+    user = await get_user(socket.user.id, db)
+    # if user.get_miniverse_role(miniverse_id) >= Role.MODERATOR:
+
+    async def log_streamer():
+        """
+        Task to read docker logs.
+        We can't use the generator directly, otherwise it will never end when WS connection is closed by client.
+        """
         async for chunk in dockerctl.get_container_logs_generator(miniverse.container_id):
-            if chunk is not None:
+            if chunk is None:
+                continue
+            try:
                 await socket.send_text(chunk)
-    except (WebSocketDisconnect, ConnectionClosedError):
-        pass
-    except Exception as e:
-        print(f"Error in WebSocket: {e}")
+            except WebSocketDisconnect:
+                break
+
+    if miniverse.container_id:
+        streamer_task = asyncio.create_task(log_streamer())
+
+        try:
+            await socket.receive_text()
+        except WebSocketDisconnect:
+            logger.info(f"{user.username} closed console logs WebSocket")
+        finally:
+            streamer_task.cancel()
+            try:
+                await streamer_task
+            except asyncio.CancelledError:
+                pass

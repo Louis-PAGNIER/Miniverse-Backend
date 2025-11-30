@@ -20,6 +20,7 @@ from app.db.session import session_config
 from app.enums import Role
 from app.managers.ServerStatusManager import server_status_manager
 from app.schemas.user import UserCreate
+from app.services.docker_service import dockerctl
 from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
 from app.services.proxy_service import start_proxy_containers, update_proxy_config, stop_proxy_containers
 from app.services.user_service import get_user_by_username, create_user
@@ -73,6 +74,7 @@ async def docker_shutdown():
             await asyncio.gather(*tasks)
         except NotFound as e:
             logger.error(e)
+    await dockerctl.close()
 
 
 def custom_cache_response_filter(_: HTTPScope, status_code: int) -> bool:

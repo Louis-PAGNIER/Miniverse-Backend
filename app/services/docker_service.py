@@ -24,6 +24,18 @@ class AsyncDockerController:
             self._aioclient = aiodocker.Docker()
         return self._aioclient
 
+    async def close(self):
+        try:
+            self.client.close()
+        except Exception:
+            pass
+
+        if self._aioclient:
+            try:
+                await self._aioclient.close()
+            except Exception:
+                pass
+
     async def list_containers(self, all: bool = True) -> list[dict[str, Any]]:
         return await asyncio.to_thread(
             lambda: [c.attrs for c in self.client.containers.list(all=all)]
@@ -128,8 +140,18 @@ class AsyncDockerController:
 
     async def get_container_logs_generator(self, container_id: str):
         container = await self.aioclient.containers.get(container_id)
-        async for chunk in container.log(follow=True, stdout=True):
-            yield chunk
+        stream = container.log(follow=True, stdout=True)
+
+        try:
+            async for chunk in stream:
+                yield chunk
+        except asyncio.CancelledError:
+            raise
+        finally:
+            try:
+                await stream.aclose()
+            except Exception:
+                pass
 
 
 dockerctl = AsyncDockerController()

@@ -84,7 +84,8 @@ async def websocket_miniverse_logs_handler(miniverse_id: str, socket: WebSocket,
         streamer_task = asyncio.create_task(log_streamer())
 
         try:
-            await socket.receive_text()
+            while user_input := await socket.receive_text():
+                await dockerctl.send_command_to_container(miniverse.container_id, user_input)
         except WebSocketDisconnect:
             logger.info(f"{user.username} closed console logs WebSocket")
         finally:

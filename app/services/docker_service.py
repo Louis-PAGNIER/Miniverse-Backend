@@ -153,5 +153,10 @@ class AsyncDockerController:
             except Exception:
                 pass
 
+    async def send_command_to_container(self, container_id: str, command: str):
+        container = await self.aioclient.containers.get(container_id)
+        stream = container.attach(stdin=True)
+        await stream.write_in(f"{command}\n".encode('utf-8'))
+
 
 dockerctl = AsyncDockerController()

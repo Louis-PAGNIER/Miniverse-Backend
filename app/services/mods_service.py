@@ -17,7 +17,7 @@ MODRINTH_BASE_URL = "https://api.modrinth.com/v2"
 def dumps_values(values: list[str] | str) -> str:
     if isinstance(values, str):
         values = [values]
-    return str(values).replace("'", '"').replace("\\", "")
+    return str(values).replace("'", '').replace("\\", "")
 
 def build_or_facets(key: str, values: list[str] | str) -> str:
     if isinstance(values, str):

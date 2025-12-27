@@ -131,9 +131,12 @@ class AsyncDockerController:
 
     async def get_container_by_name(self, name: str) -> dict[str, Any] | None:
         def _get():
-            containers = self.client.containers.list(all=True, filters={"name": name})
-            if containers:
-                return containers[0].attrs
+            try:
+                containers = self.client.containers.list(all=True, filters={"name": name})
+                if containers:
+                    return containers[0].attrs
+            except Exception as e:
+                return None
             return None
 
         return await asyncio.to_thread(_get)

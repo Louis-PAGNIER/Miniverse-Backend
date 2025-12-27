@@ -1,10 +1,31 @@
 import re
+from dataclasses import dataclass
 
 import httpx
 
 from app.schemas.minecraft import MinecraftVersion
 from app.services.mods_service import MODRINTH_BASE_URL
 
+OLD_RELEASE_FORMAT = re.compile(r"^(?P<major>\d{1,2})\.(?P<minor>\d{1,2})(?:\.(?P<patch>\d{1,2}))?$")
+NEW_RELEASE_FORMAT = re.compile(r"^(?P<major>\d{2})\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?$")
+
+OLD_SNAPSHOT_FORMAT = re.compile(r"^(?P<year>\d{2})w(?P<week>\d{2})(?P<type_version>[a-z])$")
+NEW_SNAPSHOT_FORMAT = re.compile(r"^(?P<major>\d{2})\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?-(?P<suffix>snapshot)-(?P<type_version>\d+)$")
+
+OLD_PRERELEASE_FORMAT = re.compile(r"^(?P<major>\d{1,2})\.(?P<minor>\d{1,2})(?:\.(?P<patch>\d{1,2}))?-(?P<suffix>pre|rc)(?P<type_version>\d+)$")
+# TODO: Currently not documented, will have to wait for a first MC prerelease
+NEW_PRERELEASE_FORMAT = re.compile(r"^(?P<major>\d{2})\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?-(?P<suffix>pre|rc)-(?P<type_version>\d+)$")
+
+@dataclass
+class ParsedMinecraftVersion:
+    value: str
+    type: str
+    system: str
+    major: int
+    minor: int
+    patch: int
+    type_version: int = 0
+    suffix: str | None = None
 
 # TODO: Add cache on this function
 async def get_minecraft_versions() -> list[MinecraftVersion]:
@@ -18,36 +39,80 @@ async def get_minecraft_versions() -> list[MinecraftVersion]:
         return versions
 
 
-def is_snapshot(game_version: str) -> bool:
-    return re.match(r"^\d{2}w\d{2}[a-z]$", game_version) is not None
+def parse_version(version: str) -> ParsedMinecraftVersion | None:
+    if (match := re.match(OLD_RELEASE_FORMAT, version)) is not None:
+        return ParsedMinecraftVersion(
+            match.group(0),
+            'release',
+            'old',
+            int(match.group('major')),
+            int(match.group('minor')),
+            int(match.group('patch')),
+        )
+    if (match := re.match(NEW_RELEASE_FORMAT, version)) is not None:
+        return ParsedMinecraftVersion(
+            match.group(0),
+            'release',
+            'new',
+            int(match.group('major')),
+            int(match.group('minor')),
+            int(match.group('patch')),
+        )
+    if (match := re.match(OLD_PRERELEASE_FORMAT, version)) is not None:
+        return ParsedMinecraftVersion(
+            match.group(0),
+            'prerelease',
+            'old',
+            int(match.group('major')),
+            int(match.group('minor')),
+            int(match.group('patch')),
+            int(match.group('type_version')),
+            match.group('suffix'),
+        )
+    if (match := re.match(NEW_PRERELEASE_FORMAT, version)) is not None:
+        return ParsedMinecraftVersion(
+            match.group(0),
+            'prerelease',
+            'new',
+            int(match.group('major')),
+            int(match.group('minor')),
+            int(match.group('patch')),
+            int(match.group('type_version')),
+            match.group('suffix'),
+        )
+    if (match := re.match(OLD_SNAPSHOT_FORMAT, version)) is not None:
+        return ParsedMinecraftVersion(
+            match.group(0),
+            'snapshot',
+            'old',
+            int(match.group('year')),
+            int(match.group('week')),
+            0,
+            match.group('type_version'),
+        )
+    if (match := re.match(NEW_SNAPSHOT_FORMAT, version)) is not None:
+        return ParsedMinecraftVersion(
+            match.group(0),
+            'snapshot',
+            'new',
+            int(match.group('major')),
+            int(match.group('minor')),
+            int(match.group('patch')),
+            int(match.group('type_version')),
+            match.group('suffix'),
+        )
+    return None
 
 
-def is_prerelease(game_version: str) -> bool:
-    return re.match(r"^\d{1,2}\.\d{1,2}\.\d{1,2}-(pre|rc)\d*$", game_version) is not None
-
-
-def is_release(game_version: str) -> bool:
-    return re.match(r"^\d{1,2}\.\d{1,2}\.\d{1,2}$", game_version) is not None
-
-
-def get_version_type(game_version: str) -> str | None:
-    if is_snapshot(game_version):
-        return "snapshot"
-    elif is_prerelease(game_version):
-        return "prerelease"
-    elif is_release(game_version):
-        return "release"
-    else:
-        return None
-
-
-def compare_main_versions(major1, minor1, patch1, major2, minor2, patch2) -> int:
+def compare_main_versions(major1, minor1, patch1, major2, minor2, patch2, type_version1 = 0, type_version2 = 0) -> int:
     if major1 != major2:
         return (major1 > major2) - (major1 < major2)
     if minor1 != minor2:
         return (minor1 > minor2) - (minor1 < minor2)
     if patch1 != patch2:
         return (patch1 > patch2) - (patch1 < patch2)
+    if type_version1 != type_version2:
+        return (type_version1 > type_version2) - (type_version1 < type_version2)
     return 0
 
 
@@ -94,28 +159,28 @@ async def compare_versions(v1: str, v2: str) -> int | None:
     if v1 == v2:
         return 0
 
-    v1_type = get_version_type(v1)
-    v2_type = get_version_type(v2)
+    v1_parsed = parse_version(v1)
+    v2_parsed = parse_version(v2)
 
-    if v1_type is None or v2_type is None:
+    if v2_parsed is None or v2_parsed is None:
         return None
 
-    if v1_type in ["prerelease", "release"] and v2_type in ["prerelease", "release"]:
-        v1_parts = re.split(r"[.-]", v1)
-        v2_parts = re.split(r"[.-]", v2)
+    if v1_parsed.type == "snapshot" and v1_parsed.system == "old" \
+            or v2_parsed.type == "snapshot" and v2_parsed.system == "old":
+        return await compare_by_publish_date(v1, v2)
 
-        basic_comparison = compare_main_versions(
-            int(v1_parts[0]), int(v1_parts[1]), int(v1_parts[2]),
-            int(v2_parts[0]), int(v2_parts[1]), int(v2_parts[2])
-        )
-        if basic_comparison != 0:
-            return basic_comparison
+    basic_comparison = compare_main_versions(
+        v1_parsed.major, v1_parsed.minor, v1_parsed.patch,
+        v2_parsed.major, v2_parsed.minor, v2_parsed.patch,
+    )
+    if basic_comparison != 0:
+        return basic_comparison
 
-        if v1_type == "release" and v2_type == "prerelease":
-            return 1
-        if v1_type == "prerelease" and v2_type == "release":
-            return -1
-        if v1_type == "prerelease" and v2_type == "prerelease":
-            return compare_prerelease_identifiers(v1_parts[3], v2_parts[3])
-    # TODO: Add local comparison for snapshots if both versions are snapshots
+    if v1_parsed.type == "release" and v2_parsed.type == "prerelease":
+        return 1
+    if v1_parsed.type == "prerelease" and v2_parsed.type == "release":
+        return -1
+    if v1_parsed.type == "prerelease" and v2_parsed.type == "prerelease":
+        return compare_prerelease_identifiers(v1_parsed.suffix, v2_parsed.suffix)
+
     return await compare_by_publish_date(v1, v2)

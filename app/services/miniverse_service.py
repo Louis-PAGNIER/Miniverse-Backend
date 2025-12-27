@@ -17,7 +17,7 @@ from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas import ModUpdateStatus
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
-from app.services.minecraft_service import is_release, compare_versions
+from app.services.minecraft_service import parse_version, compare_versions
 from app.services.mods_service import automatic_mod_install, list_possible_mod_updates, update_mod
 from app.services.proxy_service import update_proxy_config
 
@@ -135,8 +135,9 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
 async def init_data_path(miniverse: Miniverse, db: AsyncSession):
     volume_data_path = get_miniverse_path(miniverse.id, "data")
     game_version = miniverse.mc_version
+    parsed_game_version = parse_version(game_version)
 
-    prioritize_release = is_release(game_version)
+    prioritize_release = parsed_game_version == 'release'
 
     if not miniverse.is_on_lite_proxy:
         config_path = volume_data_path / "config"

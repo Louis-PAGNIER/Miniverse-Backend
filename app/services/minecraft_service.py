@@ -46,8 +46,8 @@ def parse_version(version: str) -> ParsedMinecraftVersion | None:
             'release',
             'old',
             int(match.group('major')),
-            int(match.group('minor')),
-            int(match.group('patch')),
+            int(match.group('minor') or 0),
+            int(match.group('patch') or 0),
         )
     if (match := re.match(NEW_RELEASE_FORMAT, version)) is not None:
         return ParsedMinecraftVersion(
@@ -55,8 +55,8 @@ def parse_version(version: str) -> ParsedMinecraftVersion | None:
             'release',
             'new',
             int(match.group('major')),
-            int(match.group('minor')),
-            int(match.group('patch')),
+            int(match.group('minor') or 0),
+            int(match.group('patch') or 0),
         )
     if (match := re.match(OLD_PRERELEASE_FORMAT, version)) is not None:
         return ParsedMinecraftVersion(
@@ -64,8 +64,8 @@ def parse_version(version: str) -> ParsedMinecraftVersion | None:
             'prerelease',
             'old',
             int(match.group('major')),
-            int(match.group('minor')),
-            int(match.group('patch')),
+            int(match.group('minor') or 0),
+            int(match.group('patch') or 0),
             int(match.group('type_version')),
             match.group('suffix'),
         )
@@ -75,8 +75,8 @@ def parse_version(version: str) -> ParsedMinecraftVersion | None:
             'prerelease',
             'new',
             int(match.group('major')),
-            int(match.group('minor')),
-            int(match.group('patch')),
+            int(match.group('minor') or 0),
+            int(match.group('patch') or 0),
             int(match.group('type_version')),
             match.group('suffix'),
         )
@@ -96,8 +96,8 @@ def parse_version(version: str) -> ParsedMinecraftVersion | None:
             'snapshot',
             'new',
             int(match.group('major')),
-            int(match.group('minor')),
-            int(match.group('patch')),
+            int(match.group('minor') or 0),
+            int(match.group('patch') or 0),
             int(match.group('type_version')),
             match.group('suffix'),
         )

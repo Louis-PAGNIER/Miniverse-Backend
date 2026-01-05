@@ -15,3 +15,6 @@ class MiniverseCreate:
 class MiniverseUpdateMCVersion:
     mc_version: str
 
+@dataclass
+class AutomaticInstallMod:
+    mod_id: str

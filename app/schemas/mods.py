@@ -103,6 +103,27 @@ class ModrinthSearchResult:
 
 
 @dataclass
+class ModrinthGalleryItem:
+    url: str
+    raw_url: str
+    featured: bool
+    title: str
+    description: str
+    created: datetime
+
+    @staticmethod
+    def from_dict(data: dict) -> "ModrinthGalleryItem":
+        return ModrinthGalleryItem(
+            url=data["url"],
+            raw_url=data["raw_url"],
+            featured=data["featured"],
+            title=data["title"],
+            description=data["description"],
+            created=datetime.fromisoformat(data["created"].replace("Z", "+00:00")),
+        )
+
+
+@dataclass
 class ModrinthProject:
     id: str
     slug: str
@@ -127,7 +148,7 @@ class ModrinthProject:
     versions: list[str]
     game_versions: list[str]
     loaders: list[str]
-    gallery: list
+    gallery: list[ModrinthGalleryItem]
 
     @staticmethod
     def from_dict(data: dict) -> "ModrinthProject":
@@ -155,7 +176,7 @@ class ModrinthProject:
             versions=data["versions"],
             game_versions=data["game_versions"],
             loaders=data["loaders"],
-            gallery=data["gallery"],
+            gallery=[ModrinthGalleryItem.from_dict(g) for g in data.get("gallery", [])],
         )
 
 

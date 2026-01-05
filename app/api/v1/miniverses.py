@@ -9,11 +9,12 @@ from app.db.session import get_db_session
 from app.enums import Role
 from app.managers.ServerStatusManager import server_status_store
 from app.models import Miniverse, Mod, User
-from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player
+from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
     start_miniverse, stop_miniverse, restart_miniverse, update_miniverse
-from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates
+from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
+    automatic_mod_install
 
 
 class MiniversesController(Controller):
@@ -95,6 +96,13 @@ class MiniversesController(Controller):
 
         return await update_miniverse(miniverse, data.mc_version, db)
 
+    @post("/{miniverse_id:str}/install/mod")
+    async def automatic_install_mod(self, current_user: User, miniverse_id: str, data: AutomaticInstallMod, db: AsyncSession) -> Mod:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to install mods in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        return await automatic_mod_install(data.mod_id, miniverse, db, retry_with_latest=True)
 
     @post("/{miniverse_id:str}/install/mod/{mod_version_id:str}")
     async def install_mod(self, current_user: User, miniverse_id: str, mod_version_id: str, db: AsyncSession) -> Mod:
@@ -106,7 +114,7 @@ class MiniversesController(Controller):
 
     @delete("/mods/{mod_id:str}")
     async def uninstall_mod(self, current_user: User, mod_id: str, db: AsyncSession) -> None:
-        if mod := get_mod(mod_id, db) is None:
+        if (mod := await get_mod(mod_id, db)) is None:
             raise NotFoundException("Mod not found in this miniverse")
 
         if current_user.get_miniverse_role(mod.miniverse_id) < Role.MODERATOR:

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import httpx
 from litestar.exceptions import ValidationException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
@@ -124,6 +125,11 @@ async def delete_mod_file(mod: Mod) -> None:
 async def install_mod(mod_version_id: str, miniverse: Miniverse, db: AsyncSession) -> Mod:
     version = await get_version_details(mod_version_id)
     project = await get_project_details(version.project_id)
+
+    existing_mod_req = await db.execute(select(Mod).where(Mod.miniverse_id == miniverse.id, Mod.project_id == project.id))
+    existing_mod: Mod | None = existing_mod_req.scalars().first()
+    if existing_mod is not None:
+        return await update_mod(existing_mod, mod_version_id, db)
 
     file_name = await download_mod_file(project, version, miniverse)
     mod = Mod(

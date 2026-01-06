@@ -1,20 +1,23 @@
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 import toml
+from docker.errors import NotFound as DockerNotFound
 from litestar.exceptions import ValidationException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.core import settings
-from app.core.utils import generate_random_string
+from app.core.utils import generate_random_string, safe_user_path
 from app.enums import MiniverseType, Role
 from app.events.miniverse_event import publish_miniverse_deleted_event, publish_miniverse_created_event, \
     publish_miniverse_updated_event, user_list_from_user_role_list
 from app.managers import server_status_manager
 from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas import ModUpdateStatus
+from app.schemas.fileinfo import FileInfo
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
 from app.services.minecraft_service import parse_version, compare_versions
@@ -22,10 +25,10 @@ from app.services.mods_service import automatic_mod_install, list_possible_mod_u
 from app.services.proxy_service import update_proxy_config
 
 
-def get_miniverse_path(proxy_id: str, *subpaths: str, from_host: bool = False) -> Path:
+def get_miniverse_path(miniverse_id: str, *subpaths: str, from_host: bool = False) -> Path:
     if from_host:
-        return settings.HOST_DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
-    return settings.DATA_PATH / "miniverses" / proxy_id / Path(*subpaths)
+        return settings.HOST_DATA_PATH / "miniverses" / miniverse_id / Path(*subpaths)
+    return settings.DATA_PATH / "miniverses" / miniverse_id / Path(*subpaths)
 
 
 async def get_miniverses(db: AsyncSession) -> list[Miniverse]:
@@ -190,7 +193,10 @@ async def stop_miniverse_container(miniverse: Miniverse) -> None:
         if container:
             container_id = container["Id"]
     if miniverse.container_id:
-        await dockerctl.stop_container(container_id)
+        try:
+            await dockerctl.stop_container(container_id)
+        except DockerNotFound:
+            pass
 
 
 async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
@@ -255,3 +261,31 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
     await start_miniverse(miniverse, db)
 
     return miniverse
+
+
+def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo]:
+    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
+    safe_path = safe_user_path(miniverse_data_path, user_path)
+
+    files = []
+    for path in Path(safe_path).glob("*"):
+        stats = path.stat()
+
+        # TODO: Created is not really creation time on UNIX system, we should probably change this in the future
+        created_at = datetime.fromtimestamp(stats.st_ctime)
+        modified_at = datetime.fromtimestamp(stats.st_mtime)
+        size = stats.st_size
+
+        file = FileInfo(
+            is_folder=path.is_dir(),
+            path=str(path.relative_to(miniverse_data_path).as_posix()),
+            name=path.name,
+            created=created_at,
+            updated=modified_at,
+            size=size,
+        )
+        files.append(file)
+
+    return files
+
+

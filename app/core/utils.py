@@ -25,3 +25,13 @@ def write_yaml_safe(data: dict, path: Path) -> None:
 
 def websocket_uri_from_miniverse_id(miniverse_id: str) -> str:
     return f"ws://miniverse-{miniverse_id}:25585"
+
+
+def safe_user_path(root: Path, user_relative_path: Path) -> Path:
+    base = root.resolve()
+    target = (base / str(user_relative_path).lstrip('/')).resolve(strict=False)
+
+    if not target.is_relative_to(base):
+        raise ValueError("Specified path is invalid")
+
+    return target

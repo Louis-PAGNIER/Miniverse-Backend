@@ -274,10 +274,11 @@ def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo
         # TODO: Created is not really creation time on UNIX system, we should probably change this in the future
         created_at = datetime.fromtimestamp(stats.st_ctime)
         modified_at = datetime.fromtimestamp(stats.st_mtime)
-        size = stats.st_size
+        is_dir = path.is_dir()
+        size = stats.st_size if not is_dir else None
 
         file = FileInfo(
-            is_folder=path.is_dir(),
+            is_folder=is_dir,
             path=str(path.relative_to(miniverse_data_path).as_posix()),
             name=path.name,
             created=created_at,

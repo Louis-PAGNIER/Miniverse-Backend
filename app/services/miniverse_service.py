@@ -290,3 +290,37 @@ def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo
     return files
 
 
+def delete_miniverse_files(miniverse: Miniverse, paths: list[Path]):
+    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
+    safe_paths = [safe_user_path(miniverse_data_path, path) for path in paths]
+    for safe_path in safe_paths:
+        if safe_path.exists():
+            if safe_path.is_dir():
+                shutil.rmtree(safe_path)
+            else:
+                safe_path.unlink()
+
+
+def copy_miniverse_files(miniverse: Miniverse, paths: list[Path], destination_path: Path):
+    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
+    safe_paths = [safe_user_path(miniverse_data_path, path) for path in paths]
+    safe_destination_path = safe_user_path(miniverse_data_path, destination_path)
+
+    for src in safe_paths:
+        if not src.exists():
+            continue
+        name = src.name
+        dst = safe_destination_path / name
+        i = 1
+
+        while dst.exists():
+            i += 1
+            if src.is_dir():
+                dst = safe_destination_path / f"{src.name} ({i})"
+            else:
+                dst = safe_destination_path / f"{src.stem} ({i}){src.suffix}"
+
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)

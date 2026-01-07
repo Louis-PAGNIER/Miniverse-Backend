@@ -14,5 +14,5 @@ class FileInfo:
     size: Optional[int]
 
 @dataclass
-class DownloadFilesRequest:
+class FilesRequest:
     paths: list[Path]

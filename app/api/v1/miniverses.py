@@ -1,16 +1,16 @@
-import io
 import json
-import zipfile
 from pathlib import Path
+from typing import Annotated
 
-import zipstream
 from litestar import get, post, Controller, delete
+from litestar.datastructures import UploadFile
 from litestar.di import Provide
+from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotFoundException, NotAuthorizedException
+from litestar.params import Body
 from litestar.response import File, Stream
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils import safe_user_path
 from app.db.session import get_db_session
 from app.enums import Role
 from app.managers.ServerStatusManager import server_status_store
@@ -20,7 +20,7 @@ from app.schemas.fileinfo import FileInfo, FilesRequest
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
     start_miniverse, stop_miniverse, restart_miniverse, update_miniverse, list_miniverse_files, get_miniverse_path, \
-    delete_miniverse_files, copy_miniverse_files, download_miniverse_files
+    delete_miniverse_files, copy_miniverse_files, download_miniverse_files, upload_miniverse_files
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
     automatic_mod_install
 
@@ -191,6 +191,22 @@ class MiniversesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
 
         return download_miniverse_files(miniverse, data.paths)
+
+    @post("/{miniverse_id:str}/files/upload")
+    async def upload_miniverse_files(
+            self,
+            current_user: User,
+            miniverse_id: str,
+            db: AsyncSession,
+            data: Annotated[list[UploadFile], Body(media_type=RequestEncodingType.MULTI_PART)],
+            destination: Path = Path("/"),
+    ) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to upload files in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        return await upload_miniverse_files(miniverse, data, destination)
 
     @get("/players")
     async def list_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:

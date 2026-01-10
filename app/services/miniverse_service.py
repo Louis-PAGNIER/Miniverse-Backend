@@ -5,6 +5,7 @@ from pathlib import Path
 import toml
 import zipstream
 from docker.errors import NotFound as DockerNotFound
+from litestar.datastructures import UploadFile
 from litestar.exceptions import ValidationException
 from litestar.response import File, Stream
 from sqlalchemy import select
@@ -355,3 +356,29 @@ def download_miniverse_files(miniverse: Miniverse, paths: list[Path]) -> File | 
             "Content-Disposition": 'attachment; filename="miniverse_files.zip"'
         },
     )
+
+
+async def upload_miniverse_files(miniverse: Miniverse, files: list[UploadFile], destination: Path):
+    base_path = get_miniverse_path(miniverse.id) / "data"
+    dest_path = safe_user_path(base_path, destination)
+
+    if dest_path.is_file():
+        raise ValueError("Destination must be a directory")
+
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    for upload in files:
+        relative_path = Path(upload.filename)
+        target = safe_user_path(dest_path, relative_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        await upload.seek(0)
+
+        with target.open("wb") as out:
+            while True:
+                chunk = await upload.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+
+        await upload.close()

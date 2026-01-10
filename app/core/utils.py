@@ -29,7 +29,8 @@ def websocket_uri_from_miniverse_id(miniverse_id: str) -> str:
 
 def safe_user_path(root: Path, user_relative_path: Path) -> Path:
     base = root.resolve()
-    target = (base / str(user_relative_path).lstrip('/')).resolve(strict=False)
+    user_relative_path = Path("./" + str(user_relative_path))
+    target = (base / user_relative_path).resolve(strict=False)
 
     if not target.is_relative_to(base):
         raise ValueError("Specified path is invalid")

@@ -3,8 +3,10 @@ from datetime import datetime
 from pathlib import Path
 
 import toml
+import zipstream
 from docker.errors import NotFound as DockerNotFound
 from litestar.exceptions import ValidationException
+from litestar.response import File, Stream
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -324,3 +326,32 @@ def copy_miniverse_files(miniverse: Miniverse, paths: list[Path], destination_pa
             shutil.copytree(src, dst)
         else:
             shutil.copy2(src, dst)
+
+
+def download_miniverse_files(miniverse: Miniverse, paths: list[Path]) -> File | Stream:
+    miniverse_data_path = get_miniverse_path(miniverse.id) / "data"
+
+    if len(paths) == 1:
+        safe_path = safe_user_path(miniverse_data_path, paths[0])
+        if safe_path.is_file():
+            return File(path=safe_path, filename=safe_path.name)
+
+    z = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+
+    for user_path in paths:
+        safe_path = safe_user_path(miniverse_data_path, user_path)
+
+        if safe_path.is_file():
+            z.write(safe_path, arcname=safe_path.relative_to(miniverse_data_path))
+        elif safe_path.is_dir():
+            for file in safe_path.rglob("*"):
+                if file.is_file():
+                    z.write(file, arcname=file.relative_to(miniverse_data_path))
+
+    return Stream(
+        z,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="miniverse_files.zip"'
+        },
+    )

@@ -3,6 +3,7 @@ import json
 import zipfile
 from pathlib import Path
 
+import zipstream
 from litestar import get, post, Controller, delete
 from litestar.di import Provide
 from litestar.exceptions import NotFoundException, NotAuthorizedException
@@ -19,7 +20,7 @@ from app.schemas.fileinfo import FileInfo, FilesRequest
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
     start_miniverse, stop_miniverse, restart_miniverse, update_miniverse, list_miniverse_files, get_miniverse_path, \
-    delete_miniverse_files, copy_miniverse_files
+    delete_miniverse_files, copy_miniverse_files, download_miniverse_files
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
     automatic_mod_install
 
@@ -188,44 +189,8 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to view files in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        miniverse_data_path = get_miniverse_path(miniverse.id) / "data"
 
-        if len(data.paths) == 1:
-            safe_path = safe_user_path(miniverse_data_path, data.paths[0])
-            if safe_path.is_file():
-                return File(path=safe_path, filename=safe_path.name)
-
-        zip_buffer = io.BytesIO()
-
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for user_path in data.paths:
-                safe_path = safe_user_path(miniverse_data_path, user_path)
-
-                if not safe_path.exists():
-                    continue
-
-                if safe_path.is_file():
-                    zipf.write(
-                        safe_path,
-                        arcname=safe_path.relative_to(miniverse_data_path)
-                    )
-                elif safe_path.is_dir():
-                    for file in safe_path.rglob("*"):
-                        if file.is_file():
-                            zipf.write(
-                                file,
-                                arcname=file.relative_to(miniverse_data_path)
-                            )
-
-        zip_buffer.seek(0)
-
-        return Stream(
-            zip_buffer,
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": 'attachment; filename="miniverse_files.zip"'
-            },
-        )
+        return download_miniverse_files(miniverse, data.paths)
 
     @get("/players")
     async def list_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:

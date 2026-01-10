@@ -18,6 +18,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-# TODO: check if HOST_DATA_PATH is valid (is not None + does path exist + is dir)
 # Ensure the data path exists
 settings.DATA_PATH.mkdir(parents=True, exist_ok=True)

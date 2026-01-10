@@ -3,7 +3,7 @@ from typing import Any
 import bcrypt
 from litestar import Request
 from litestar.connection import ASGIConnection
-from litestar.exceptions import NotAuthorizedException, InternalServerException
+from litestar.exceptions import NotAuthorizedException
 from litestar.handlers import BaseRouteHandler
 from litestar.security.jwt import Token, OAuth2PasswordBearerAuth
 
@@ -38,7 +38,7 @@ oauth2_auth = OAuth2PasswordBearerAuth[User](
     retrieve_user_handler=retrieve_user_handler,
     token_secret=settings.JWT_SECRET,
     token_url="/api/login",
-    exclude=["/api/login", "/docs"],
+    exclude=["/api/login", "/docs"],  # TODO: /api/login redundant ?
     samesite="none",
     secure=True
 )

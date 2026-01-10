@@ -92,7 +92,7 @@ app = Litestar(
     response_cache_config=response_cache_config,
     route_handlers=[login, UsersController, MiniversesController, FilesController, ModsController, MinecraftController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
-    on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
+    on_startup=[db_startup, proxy_startup, docker_startup, server_status_manager_startup],
     on_shutdown=[docker_shutdown],  # TODO: Do we really need to shutdown all containers ?
     on_app_init=[oauth2_auth.on_app_init],
     openapi_config=OpenAPIConfig(

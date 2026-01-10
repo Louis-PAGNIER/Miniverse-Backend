@@ -67,10 +67,10 @@ def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
             },
             "acceptTransfers": True,
         },
-        "api": {
-            "enabled": True,
-            "bind": "0.0.0.0:8080"
-        }
+        # "api": {
+        #     "enabled": True, # Can be enabled to control this service
+        #     "bind": "0.0.0.0:8080"
+        # }
     }
 
 
@@ -117,7 +117,7 @@ async def start_proxy_containers() -> None:
             name="miniverse-gate-classic",
             network_id=settings.DOCKER_NETWORK_NAME,
             volumes={str(classic_proxy_config_path.parent): VolumeConfig(bind="/configs")},
-            ports={"8080/tcp": 8080},
+            # ports={"8080/tcp": 8080}, # Can be enabled to control this service
             entrypoint="/gate",
             command=["--config", "/configs/config-classic.yml"],
             auto_remove=True,

@@ -15,18 +15,18 @@ from app.schemas.mods import ModrinthSearchFacets, ModrinthSearchResults, Modrin
 
 MODRINTH_BASE_URL = "https://api.modrinth.com/v2"
 
-def dumps_values(values: list[str] | str) -> str:
-    if isinstance(values, str):
-        values = [values]
-    return str(values).replace("'", '').replace("\\", "")
 
-def build_or_facets(key: str, values: list[str] | str) -> str:
+def dumps_values(values: list) -> str:
+    return str(values).replace("'", '"').replace("\\", "")
+
+
+def build_or_facets(key: str, values: list[str] | str) -> list:
     if isinstance(values, str):
         values = [values]
     res = []
     for v in values:
-        res.append(f'"{key}:{v}"')
-    return str(res)
+        res.append(f'{key}:{v}')
+    return res
 
 def build_facets(facets: ModrinthSearchFacets) -> str:
     res = []
@@ -61,8 +61,8 @@ async def list_project_versions(project_id: str, loader: MiniverseType = None, m
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{MODRINTH_BASE_URL}/project/{project_id}/version",
                                     params={
-                                      "loaders": dumps_values(loader.value.lower()) if loader else None,
-                                      "game_versions": dumps_values(mc_version) if mc_version else None
+                                        "loaders": dumps_values([loader.value.lower()]) if loader else None,
+                                        "game_versions": dumps_values([mc_version]) if mc_version else None
                                     })
         response.raise_for_status()
         data = response.json()

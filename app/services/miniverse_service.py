@@ -205,7 +205,7 @@ async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
     await db.commit()
     await db.refresh(miniverse)
 
-    server_status_manager.remove_miniverse(miniverse)
+    server_status_manager.remove_miniverse(miniverse.id)
 
     publish_miniverse_updated_event(miniverse.id)
 

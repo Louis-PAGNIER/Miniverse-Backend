@@ -23,6 +23,7 @@ from app.services.files_service import list_miniverse_files, delete_miniverse_fi
     compress_miniverse_files, download_tokens_store
 from app.services.miniverse_service import get_miniverse
 
+
 class FilesController(Controller):
     path = "/api/files"
     tags = ["Files"]
@@ -84,7 +85,7 @@ class FilesController(Controller):
     async def download_files(self, token: str) -> File | Stream:
         data = await download_tokens_store.get(token)
         if data is None:
-            raise ValueError("Invalid token")
+            raise NotAuthorizedException("Invalid token")
 
         paths: list[Path] = [Path(p) for p in json.loads(data)]
         return download_files(paths)

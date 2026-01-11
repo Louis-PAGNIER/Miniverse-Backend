@@ -60,7 +60,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
     volumes:
-      - ./keycloak/miniverse-realm.json:/opt/keycloak/data/import/miniverse-realm.json
+      - ./keycloak/import/:/opt/keycloak/data/import/
     networks:
       - mysql-keycloak-net
     depends_on:

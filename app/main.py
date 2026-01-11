@@ -12,6 +12,7 @@ from litestar.types import HTTPScope
 from app import logger
 from app.api.v1 import UsersController, MiniversesController, ModsController
 from app.api.v1 import oauth2_auth, login
+from app.api.v1.files import FilesController
 from app.api.v1.minecraft import MinecraftController
 from app.api.v1.websockets import websocket_miniverse_updates_handler, websocket_miniverse_logs_handler
 from app.core.channels import channels_plugin
@@ -89,7 +90,7 @@ cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)  # TODO: d
 app = Litestar(
     cors_config=cors_config,
     response_cache_config=response_cache_config,
-    route_handlers=[login, UsersController, MiniversesController, ModsController, MinecraftController,
+    route_handlers=[login, UsersController, MiniversesController, FilesController, ModsController, MinecraftController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
     on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
     on_shutdown=[docker_shutdown],  # TODO: Do we really need to shutdown all containers ?

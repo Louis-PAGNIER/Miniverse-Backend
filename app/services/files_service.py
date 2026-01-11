@@ -1,0 +1,219 @@
+import shutil
+import zipfile
+from copy import copy
+from datetime import datetime
+from pathlib import Path
+
+import zipstream
+from litestar.concurrency import sync_to_thread
+from litestar.datastructures import UploadFile
+from litestar.response import File, Stream
+
+from app.models import Miniverse
+from app.schemas.fileinfo import FileInfo
+from app.services.miniverse_service import get_miniverse_path
+
+
+def safe_user_path(root: Path, user_relative_path: Path) -> Path:
+    base = root.resolve()
+    user_relative_path = Path("./" + str(user_relative_path))
+    target = (base / user_relative_path).resolve(strict=False)
+
+    if not target.is_relative_to(base):
+        raise ValueError("Specified path is invalid")
+
+    return target
+
+
+def change_path_name_if_exists(path: Path) -> Path:
+    parent = path.parent
+    new_path = copy(path)
+
+    i = 1
+    while new_path.exists():
+        i += 1
+        if path.is_dir():
+            new_path = parent / f"{path.name} ({i})"
+        else:
+            new_path = parent / f"{path.stem} ({i}){path.suffix}"
+
+    return new_path
+
+
+def get_zip_roots(z: zipfile.ZipFile) -> set[str]:
+    roots: set[str] = set()
+
+    for info in z.infolist():
+        if not info.filename:
+            continue
+
+        parts = Path(info.filename).parts
+        if parts:
+            roots.add(parts[0])
+
+    return roots
+
+
+async def _extract_zip(
+    archive_path: Path,
+    extract_dir: Path,
+):
+    def extract():
+        with zipfile.ZipFile(archive_path) as z:
+            roots = get_zip_roots(z)
+
+            if len(roots) == 1:
+                container_name = next(iter(roots))
+            else:
+                container_name = archive_path.stem
+
+            container_dir = change_path_name_if_exists(
+                safe_user_path(extract_dir, Path(container_name))
+            )
+
+            container_dir.mkdir(parents=True, exist_ok=True)
+
+            for member in z.infolist():
+                if member.is_dir():
+                    continue
+
+                member_path = Path(member.filename)
+
+                if len(roots) == 1:
+                    member_path = Path(*member_path.parts[1:])
+
+                target = safe_user_path(container_dir, member_path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+
+                with z.open(member) as src, target.open("wb") as dst:
+                    while chunk := src.read(1024 * 1024):
+                        dst.write(chunk)
+
+    await sync_to_thread(extract)
+
+def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo]:
+    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
+    safe_path = safe_user_path(miniverse_data_path, user_path)
+
+    files = []
+    for path in Path(safe_path).glob("*"):
+        stats = path.stat()
+
+        # TODO: Created is not really creation time on UNIX system, we should probably change this in the future
+        created_at = datetime.fromtimestamp(stats.st_ctime)
+        modified_at = datetime.fromtimestamp(stats.st_mtime)
+        is_dir = path.is_dir()
+        size = stats.st_size if not is_dir else None
+
+        file = FileInfo(
+            is_folder=is_dir,
+            path=str(path.relative_to(miniverse_data_path).as_posix()),
+            name=path.name,
+            created=created_at,
+            updated=modified_at,
+            size=size,
+        )
+        files.append(file)
+
+    return files
+
+
+def delete_miniverse_files(miniverse: Miniverse, paths: list[Path]):
+    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
+    safe_paths = [safe_user_path(miniverse_data_path, path) for path in paths]
+    for safe_path in safe_paths:
+        if safe_path.exists():
+            if safe_path.is_dir():
+                shutil.rmtree(safe_path)
+            else:
+                safe_path.unlink()
+
+
+def copy_miniverse_files(miniverse: Miniverse, paths: list[Path], destination_path: Path):
+    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
+    safe_paths = [safe_user_path(miniverse_data_path, path) for path in paths]
+    safe_destination_path = safe_user_path(miniverse_data_path, destination_path)
+
+    for src in safe_paths:
+        if not src.exists():
+            continue
+
+        dst = change_path_name_if_exists(safe_destination_path / src.name)
+
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+
+
+def transform_safe_miniverse_files(miniverse: Miniverse, paths: list[Path]):
+    miniverse_data_path = get_miniverse_path(miniverse.id) / "data"
+    return [safe_user_path(miniverse_data_path, p) for p in paths]
+
+
+def download_files(paths: list[Path]) -> File | Stream:
+    if len(paths) == 1:
+        if paths[0].is_file():
+            return File(path=paths[0], filename=paths[0].name)
+
+    z = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+
+    for path in paths:
+        parent = path.parent
+        if path.is_file():
+            z.write(path, arcname=path.relative_to(parent))
+        elif path.is_dir():
+            for file in path.rglob("*"):
+                if file.is_file():
+                    z.write(file, arcname=file.relative_to(parent))
+
+    return Stream(
+        z,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="miniverse_files.zip"'
+        },
+    )
+
+
+async def upload_miniverse_files(miniverse: Miniverse, files: list[UploadFile], destination: Path):
+    base_path = get_miniverse_path(miniverse.id) / "data"
+    dest_path = safe_user_path(base_path, destination)
+
+    if dest_path.is_file():
+        raise ValueError("Destination must be a directory")
+
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    for upload in files:
+        relative_path = Path(upload.filename)
+        target = safe_user_path(dest_path, relative_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        target = change_path_name_if_exists(target)
+
+        await upload.seek(0)
+
+        with target.open("wb") as out:
+            while True:
+                chunk = await upload.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+
+        await upload.close()
+
+
+async def extract_miniverse_archive(miniverse: Miniverse, path: Path):
+    base_path = get_miniverse_path(miniverse.id) / "data"
+    file_to_extract = safe_user_path(base_path, path)
+
+    if not file_to_extract.is_file():
+        raise ValueError(f"File {file_to_extract} does not exist")
+
+    extract_dir = file_to_extract.parent
+
+    if file_to_extract.suffix.lower() == ".zip":
+        await _extract_zip(file_to_extract, extract_dir)
+    else:
+        raise ValueError("Unsupported archive format")

@@ -1,14 +1,8 @@
 import json
-from pathlib import Path
-from typing import Annotated
 
 from litestar import get, post, Controller, delete
-from litestar.datastructures import UploadFile
 from litestar.di import Provide
-from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotFoundException, NotAuthorizedException
-from litestar.params import Body
-from litestar.response import File, Stream
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
@@ -16,12 +10,9 @@ from app.enums import Role
 from app.managers.ServerStatusManager import server_status_store
 from app.models import Miniverse, Mod, User
 from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod
-from app.schemas.fileinfo import FileInfo, FilesRequest
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
-    start_miniverse, stop_miniverse, restart_miniverse, update_miniverse, list_miniverse_files, get_miniverse_path, \
-    delete_miniverse_files, copy_miniverse_files, download_miniverse_files, upload_miniverse_files, \
-    extract_miniverse_archive
+    start_miniverse, stop_miniverse, restart_miniverse, update_miniverse
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
     automatic_mod_install
 
@@ -150,79 +141,6 @@ class MiniversesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
 
         return await list_possible_mod_updates(miniverse)
-
-    @get("/{miniverse_id:str}/files")
-    async def list_miniverse_files(self, current_user: User, miniverse_id: str, db: AsyncSession, path: Path = Path("/")) -> list[FileInfo]:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to view files in this miniverse")
-
-        miniverse = await get_miniverse(miniverse_id, db)
-
-        return list_miniverse_files(miniverse, path)
-
-    @post("/{miniverse_id:str}/files/delete")
-    async def delete_miniverse_files(self, current_user: User, miniverse_id: str, db: AsyncSession, data: FilesRequest) -> None:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to delete files in this miniverse")
-
-        miniverse = await get_miniverse(miniverse_id, db)
-
-        return delete_miniverse_files(miniverse, data.paths)
-
-    @post("/{miniverse_id:str}/files/copy")
-    async def copy_miniverse_files(self, current_user: User, miniverse_id: str, db: AsyncSession, data: FilesRequest, destination: Path) -> None:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to copy files in this miniverse")
-
-        miniverse = await get_miniverse(miniverse_id, db)
-
-        return copy_miniverse_files(miniverse, data.paths, destination)
-
-    @post("/{miniverse_id:str}/files/download")
-    async def download_miniverse_files(
-            self,
-            current_user: User,
-            miniverse_id: str,
-            db: AsyncSession,
-            data: FilesRequest,
-    ) -> File | Stream:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to view files in this miniverse")
-
-        miniverse = await get_miniverse(miniverse_id, db)
-
-        return download_miniverse_files(miniverse, data.paths)
-
-    @post("/{miniverse_id:str}/files/upload", request_max_body_size=50 * (1024 ** 3))
-    async def upload_miniverse_files(
-            self,
-            current_user: User,
-            miniverse_id: str,
-            db: AsyncSession,
-            data: Annotated[list[UploadFile], Body(media_type=RequestEncodingType.MULTI_PART)],
-            destination: Path = Path("/"),
-    ) -> None:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to upload files in this miniverse")
-
-        miniverse = await get_miniverse(miniverse_id, db)
-
-        return await upload_miniverse_files(miniverse, data, destination)
-
-    @post("/{miniverse_id:str}/files/extract")
-    async def extract_miniverse_archive(
-            self,
-            current_user: User,
-            miniverse_id: str,
-            db: AsyncSession,
-            path: Path = Path("/"),
-    ) -> None:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to upload files in this miniverse")
-
-        miniverse = await get_miniverse(miniverse_id, db)
-
-        return await extract_miniverse_archive(miniverse, path)
 
     @get("/players")
     async def list_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:

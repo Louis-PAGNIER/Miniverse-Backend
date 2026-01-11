@@ -1,27 +1,21 @@
 import shutil
-import zipfile
-from datetime import datetime
 from pathlib import Path
 
 import toml
-import zipstream
 from docker.errors import NotFound as DockerNotFound
-from litestar.datastructures import UploadFile
 from litestar.exceptions import ValidationException
-from litestar.response import File, Stream
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.core import settings
-from app.core.utils import generate_random_string, safe_user_path, change_path_name_if_exists, _extract_zip
+from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
 from app.events.miniverse_event import publish_miniverse_deleted_event, publish_miniverse_created_event, \
     publish_miniverse_updated_event, user_list_from_user_role_list
 from app.managers import server_status_manager
 from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas import ModUpdateStatus
-from app.schemas.fileinfo import FileInfo
 from app.schemas.miniverse import MiniverseCreate
 from app.services.docker_service import dockerctl, VolumeConfig
 from app.services.minecraft_service import parse_version, compare_versions
@@ -265,130 +259,3 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
     await start_miniverse(miniverse, db)
 
     return miniverse
-
-
-def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo]:
-    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
-    safe_path = safe_user_path(miniverse_data_path, user_path)
-
-    files = []
-    for path in Path(safe_path).glob("*"):
-        stats = path.stat()
-
-        # TODO: Created is not really creation time on UNIX system, we should probably change this in the future
-        created_at = datetime.fromtimestamp(stats.st_ctime)
-        modified_at = datetime.fromtimestamp(stats.st_mtime)
-        is_dir = path.is_dir()
-        size = stats.st_size if not is_dir else None
-
-        file = FileInfo(
-            is_folder=is_dir,
-            path=str(path.relative_to(miniverse_data_path).as_posix()),
-            name=path.name,
-            created=created_at,
-            updated=modified_at,
-            size=size,
-        )
-        files.append(file)
-
-    return files
-
-
-def delete_miniverse_files(miniverse: Miniverse, paths: list[Path]):
-    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
-    safe_paths = [safe_user_path(miniverse_data_path, path) for path in paths]
-    for safe_path in safe_paths:
-        if safe_path.exists():
-            if safe_path.is_dir():
-                shutil.rmtree(safe_path)
-            else:
-                safe_path.unlink()
-
-
-def copy_miniverse_files(miniverse: Miniverse, paths: list[Path], destination_path: Path):
-    miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
-    safe_paths = [safe_user_path(miniverse_data_path, path) for path in paths]
-    safe_destination_path = safe_user_path(miniverse_data_path, destination_path)
-
-    for src in safe_paths:
-        if not src.exists():
-            continue
-
-        dst = change_path_name_if_exists(safe_destination_path / src.name)
-
-        if src.is_dir():
-            shutil.copytree(src, dst)
-        else:
-            shutil.copy2(src, dst)
-
-
-def download_miniverse_files(miniverse: Miniverse, paths: list[Path]) -> File | Stream:
-    miniverse_data_path = get_miniverse_path(miniverse.id) / "data"
-
-    if len(paths) == 1:
-        safe_path = safe_user_path(miniverse_data_path, paths[0])
-        if safe_path.is_file():
-            return File(path=safe_path, filename=safe_path.name)
-
-    z = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
-
-    for user_path in paths:
-        safe_path = safe_user_path(miniverse_data_path, user_path)
-
-        if safe_path.is_file():
-            z.write(safe_path, arcname=safe_path.relative_to(miniverse_data_path))
-        elif safe_path.is_dir():
-            for file in safe_path.rglob("*"):
-                if file.is_file():
-                    z.write(file, arcname=file.relative_to(miniverse_data_path))
-
-    return Stream(
-        z,
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": 'attachment; filename="miniverse_files.zip"'
-        },
-    )
-
-
-async def upload_miniverse_files(miniverse: Miniverse, files: list[UploadFile], destination: Path):
-    base_path = get_miniverse_path(miniverse.id) / "data"
-    dest_path = safe_user_path(base_path, destination)
-
-    if dest_path.is_file():
-        raise ValueError("Destination must be a directory")
-
-    dest_path.mkdir(parents=True, exist_ok=True)
-
-    for upload in files:
-        relative_path = Path(upload.filename)
-        target = safe_user_path(dest_path, relative_path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-
-        target = change_path_name_if_exists(target)
-
-        await upload.seek(0)
-
-        with target.open("wb") as out:
-            while True:
-                chunk = await upload.read(1024 * 1024)
-                if not chunk:
-                    break
-                out.write(chunk)
-
-        await upload.close()
-
-
-async def extract_miniverse_archive(miniverse: Miniverse, path: Path):
-    base_path = get_miniverse_path(miniverse.id) / "data"
-    file_to_extract = safe_user_path(base_path, path)
-
-    if not file_to_extract.is_file():
-        raise ValueError(f"File {file_to_extract} does not exist")
-
-    extract_dir = file_to_extract.parent
-
-    if file_to_extract.suffix.lower() == ".zip":
-        await _extract_zip(file_to_extract, extract_dir)
-    else:
-        raise ValueError("Unsupported archive format")

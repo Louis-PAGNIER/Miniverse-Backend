@@ -9,9 +9,12 @@ from litestar.concurrency import sync_to_thread
 from litestar.datastructures import UploadFile
 from litestar.response import File, Stream
 
+from app.core import root_store
 from app.models import Miniverse
 from app.schemas.fileinfo import FileInfo
 from app.services.miniverse_service import get_miniverse_path
+
+download_tokens_store = root_store.with_namespace("download-tokens")
 
 
 def safe_user_path(root: Path, user_relative_path: Path) -> Path:
@@ -217,3 +220,46 @@ async def extract_miniverse_archive(miniverse: Miniverse, path: Path):
         await _extract_zip(file_to_extract, extract_dir)
     else:
         raise ValueError("Unsupported archive format")
+
+
+async def compress_miniverse_files(miniverse: Miniverse, paths: list[Path]):
+    miniverse_data_path = get_miniverse_path(miniverse.id) / "data"
+    files_to_compress = [safe_user_path(miniverse_data_path, p) for p in paths]
+
+    parents = set()
+    for file in files_to_compress:
+        parents.add(file.parent)
+
+    if len(parents) != 1:
+        raise ValueError("Files to compress must have same parent")
+
+    destination_name = files_to_compress[0].name + ".zip" if len(files_to_compress) == 1 else "Archive.zip"
+    destination = change_path_name_if_exists(files_to_compress[0].parent / destination_name)
+
+    z = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+
+    for path in paths:
+        parent = path.parent
+        if path.is_file():
+            z.write(path, arcname=path.relative_to(parent))
+        elif path.is_dir():
+            for file in path.rglob("*"):
+                if file.is_file():
+                    z.write(file, arcname=file.relative_to(parent))
+
+    with open(destination, 'wb') as f:
+        for data in z:
+            f.write(data)
+
+
+def rename_file(miniverse: Miniverse, path: Path, new_name: str):
+    base_path = get_miniverse_path(miniverse.id) / "data"
+    file_to_rename = safe_user_path(base_path, path)
+
+    new_path = path.with_name(new_name)
+    new_path_safe = safe_user_path(base_path, new_path)
+    if new_path_safe.exists():
+        raise ValueError(f"File {new_path_safe} already exists")
+
+    file_to_rename.rename(new_path_safe)
+

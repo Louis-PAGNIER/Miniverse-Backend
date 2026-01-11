@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -13,16 +14,14 @@ from litestar.response import File, Stream
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import get_db_session
-from app.core import root_store
 from app.enums import Role
 from app.models import User
-from app.schemas.fileinfo import FileInfo, FilesRequest
+from app.schemas.fileinfo import FileInfo, FilesRequest, RenameFileRequest
 from app.services.auth_service import get_current_user
 from app.services.files_service import list_miniverse_files, delete_miniverse_files, copy_miniverse_files, \
-    transform_safe_miniverse_files, download_files, upload_miniverse_files, extract_miniverse_archive
+    transform_safe_miniverse_files, download_files, upload_miniverse_files, extract_miniverse_archive, rename_file, \
+    compress_miniverse_files, download_tokens_store
 from app.services.miniverse_service import get_miniverse
-
-download_tokens_store = root_store.with_namespace("download-tokens")
 
 class FilesController(Controller):
     path = "/api/files"
@@ -77,7 +76,7 @@ class FilesController(Controller):
         safe_paths = transform_safe_miniverse_files(miniverse, data.paths)
 
         token = uuid.uuid4().hex
-        await download_tokens_store.set(token, json.dumps([str(p) for p in safe_paths]))
+        await download_tokens_store.set(token, json.dumps([str(p) for p in safe_paths]), expires_in=timedelta(minutes=5).seconds)
 
         return token
 
@@ -120,3 +119,27 @@ class FilesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
 
         return await extract_miniverse_archive(miniverse, path)
+
+    @post("/{miniverse_id:str}/compress")
+    async def compress_miniverse_files(
+            self,
+            current_user: User,
+            miniverse_id: str,
+            data: FilesRequest,
+            db: AsyncSession
+    ) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to compress files in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        return await compress_miniverse_files(miniverse, data.paths)
+
+    @post("/{miniverse_id:str}/rename")
+    async def rename_miniverse_file(self, current_user: User, miniverse_id: str, db: AsyncSession, data: RenameFileRequest) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to rename files in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        rename_file(miniverse, data.path, data.new_name)

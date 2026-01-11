@@ -16,3 +16,8 @@ class FileInfo:
 @dataclass
 class FilesRequest:
     paths: list[Path]
+
+@dataclass
+class RenameFileRequest:
+    path: Path
+    new_name: str

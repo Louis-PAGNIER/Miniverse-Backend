@@ -1,8 +1,11 @@
+import json
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 
 import httpx
 
+from app.core import root_store
 from app.schemas.minecraft import MinecraftVersion
 from app.services.mods_service import MODRINTH_BASE_URL
 
@@ -15,6 +18,8 @@ NEW_SNAPSHOT_FORMAT = re.compile(r"^(?P<major>\d{2})\.(?P<minor>\d+)(?:\.(?P<pat
 OLD_PRERELEASE_FORMAT = re.compile(r"^(?P<major>\d{1,2})\.(?P<minor>\d{1,2})(?:\.(?P<patch>\d{1,2}))?-(?P<suffix>pre|rc)(?P<type_version>\d+)$")
 # TODO: Currently not documented, will have to wait for a first MC prerelease
 NEW_PRERELEASE_FORMAT = re.compile(r"^(?P<major>\d{2})\.(?P<minor>\d+)(?:\.(?P<patch>\d+))?-(?P<suffix>pre|rc)-(?P<type_version>\d+)$")
+
+minecraft_cache_store = root_store.with_namespace("minecraft")
 
 @dataclass
 class ParsedMinecraftVersion:
@@ -29,10 +34,17 @@ class ParsedMinecraftVersion:
 
 # TODO: Add cache on this function
 async def get_minecraft_versions() -> list[MinecraftVersion]:
+    cached = await minecraft_cache_store.get("versions")
+    if cached:
+        return [MinecraftVersion.from_dict(v) for v in json.loads(cached)]
+
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{MODRINTH_BASE_URL}/tag/game_version")
         response.raise_for_status()
         data = response.json()
+
+        await minecraft_cache_store.set("minecraft_versions", json.dumps(data), expires_in=timedelta(minutes=10).seconds)
+
         versions = [
             MinecraftVersion.from_dict(v) for v in data
         ]

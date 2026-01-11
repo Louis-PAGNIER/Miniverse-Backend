@@ -979,14 +979,14 @@ all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2
 
 [[package]]
 name = "litestar"
-version = "2.17.0"
+version = "2.19.0"
 description = "Litestar - A production-ready, highly performant, extensible ASGI API Framework"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "litestar-2.17.0-py3-none-any.whl", hash = "sha256:2e62f01f852195362d69e3305cccddaf6371f5ab0ced30a081a66fb85e1df532"},
-    {file = "litestar-2.17.0.tar.gz", hash = "sha256:0f50c3b7063417c338b32902f9eb40b81a7b14c9802edbff921a24aec3b0ea5b"},
+    {file = "litestar-2.19.0-py3-none-any.whl", hash = "sha256:849971d097a6118f81235531fc0f342d797bd29d9aef9c23230559f124d16247"},
+    {file = "litestar-2.19.0.tar.gz", hash = "sha256:c2663a7f48a7ed273615260c23fc76dbef2ca0d539ece25318772b737470c531"},
 ]
 
 [package.dependencies]
@@ -1003,15 +1003,16 @@ pyjwt = {version = ">=2.9.0", optional = true, markers = "extra == \"jwt\""}
 pyyaml = "*"
 rich = ">=13.0.0"
 rich-click = "*"
+sniffio = ">=1.3.1"
 typing-extensions = "*"
 
 [package.extras]
 annotated-types = ["annotated-types"]
 attrs = ["attrs"]
 brotli = ["brotli"]
-cli = ["jsbeautifier", "uvicorn[standard]", "uvloop (>=0.18.0) ; sys_platform != \"win32\""]
+cli = ["jsbeautifier", "uvicorn[standard]"]
 cryptography = ["cryptography"]
-full = ["advanced-alchemy (>=0.2.2)", "annotated-types", "attrs", "brotli", "cryptography", "email-validator", "fast-query-parsers (>=1.0.2)", "jinja2", "jinja2 (>=3.1.2)", "jsbeautifier", "mako (>=1.2.4)", "minijinja (>=1.0.0)", "opentelemetry-instrumentation-asgi", "piccolo", "picologging ; python_version < \"3.13\"", "prometheus-client", "pydantic", "pydantic-extra-types (!=2.9.0) ; python_version < \"3.9\"", "pydantic-extra-types ; python_version >= \"3.9\"", "pyjwt (>=2.9.0)", "redis[hiredis] (>=4.4.4,<5.3)", "structlog", "uvicorn[standard]", "uvloop (>=0.18.0) ; sys_platform != \"win32\"", "valkey[libvalkey] (>=6.0.2)"]
+full = ["advanced-alchemy (>=0.2.2)", "annotated-types", "attrs", "brotli", "cryptography", "email-validator", "fast-query-parsers (>=1.0.2)", "jinja2", "jinja2 (>=3.1.2)", "jsbeautifier", "mako (>=1.2.4)", "minijinja (>=1.0.0)", "opentelemetry-instrumentation-asgi", "piccolo", "picologging ; python_version < \"3.13\"", "prometheus-client", "pydantic", "pydantic-extra-types (!=2.9.0) ; python_version < \"3.9\"", "pydantic-extra-types ; python_version >= \"3.9\"", "pyjwt (>=2.9.0)", "redis[hiredis] (>=4.4.4,<5.3)", "structlog", "uvicorn[standard]", "valkey[libvalkey] (>=6.0.2)"]
 jinja = ["jinja2 (>=3.1.2)"]
 jwt = ["cryptography", "pyjwt (>=2.9.0)"]
 mako = ["mako (>=1.2.4)"]
@@ -1023,7 +1024,7 @@ prometheus = ["prometheus-client"]
 pydantic = ["email-validator", "pydantic", "pydantic-extra-types (!=2.9.0) ; python_version < \"3.9\"", "pydantic-extra-types ; python_version >= \"3.9\""]
 redis = ["redis[hiredis] (>=4.4.4,<5.3)"]
 sqlalchemy = ["advanced-alchemy (>=0.2.2)"]
-standard = ["fast-query-parsers (>=1.0.2)", "jinja2", "jsbeautifier", "uvicorn[standard]", "uvloop (>=0.18.0) ; sys_platform != \"win32\""]
+standard = ["fast-query-parsers (>=1.0.2)", "jinja2", "jsbeautifier", "uvicorn[standard]"]
 structlog = ["structlog"]
 valkey = ["valkey[libvalkey] (>=6.0.2)"]
 

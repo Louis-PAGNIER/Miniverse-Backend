@@ -1,4 +1,5 @@
 import shutil
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
 from app.core import settings
-from app.core.utils import generate_random_string, safe_user_path
+from app.core.utils import generate_random_string, safe_user_path, change_path_name_if_exists, _extract_zip
 from app.enums import MiniverseType, Role
 from app.events.miniverse_event import publish_miniverse_deleted_event, publish_miniverse_created_event, \
     publish_miniverse_updated_event, user_list_from_user_role_list
@@ -312,16 +313,8 @@ def copy_miniverse_files(miniverse: Miniverse, paths: list[Path], destination_pa
     for src in safe_paths:
         if not src.exists():
             continue
-        name = src.name
-        dst = safe_destination_path / name
-        i = 1
 
-        while dst.exists():
-            i += 1
-            if src.is_dir():
-                dst = safe_destination_path / f"{src.name} ({i})"
-            else:
-                dst = safe_destination_path / f"{src.stem} ({i}){src.suffix}"
+        dst = change_path_name_if_exists(safe_destination_path / src.name)
 
         if src.is_dir():
             shutil.copytree(src, dst)
@@ -372,6 +365,8 @@ async def upload_miniverse_files(miniverse: Miniverse, files: list[UploadFile], 
         target = safe_user_path(dest_path, relative_path)
         target.parent.mkdir(parents=True, exist_ok=True)
 
+        target = change_path_name_if_exists(target)
+
         await upload.seek(0)
 
         with target.open("wb") as out:
@@ -382,3 +377,18 @@ async def upload_miniverse_files(miniverse: Miniverse, files: list[UploadFile], 
                 out.write(chunk)
 
         await upload.close()
+
+
+async def extract_miniverse_archive(miniverse: Miniverse, path: Path):
+    base_path = get_miniverse_path(miniverse.id) / "data"
+    file_to_extract = safe_user_path(base_path, path)
+
+    if not file_to_extract.is_file():
+        raise ValueError(f"File {file_to_extract} does not exist")
+
+    extract_dir = file_to_extract.parent
+
+    if file_to_extract.suffix.lower() == ".zip":
+        await _extract_zip(file_to_extract, extract_dir)
+    else:
+        raise ValueError("Unsupported archive format")

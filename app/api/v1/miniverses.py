@@ -20,7 +20,8 @@ from app.schemas.fileinfo import FileInfo, FilesRequest
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
     start_miniverse, stop_miniverse, restart_miniverse, update_miniverse, list_miniverse_files, get_miniverse_path, \
-    delete_miniverse_files, copy_miniverse_files, download_miniverse_files, upload_miniverse_files
+    delete_miniverse_files, copy_miniverse_files, download_miniverse_files, upload_miniverse_files, \
+    extract_miniverse_archive
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
     automatic_mod_install
 
@@ -192,7 +193,7 @@ class MiniversesController(Controller):
 
         return download_miniverse_files(miniverse, data.paths)
 
-    @post("/{miniverse_id:str}/files/upload")
+    @post("/{miniverse_id:str}/files/upload", request_max_body_size=50 * (1024 ** 3))
     async def upload_miniverse_files(
             self,
             current_user: User,
@@ -207,6 +208,21 @@ class MiniversesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
 
         return await upload_miniverse_files(miniverse, data, destination)
+
+    @post("/{miniverse_id:str}/files/extract")
+    async def extract_miniverse_archive(
+            self,
+            current_user: User,
+            miniverse_id: str,
+            db: AsyncSession,
+            path: Path = Path("/"),
+    ) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to upload files in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        return await extract_miniverse_archive(miniverse, path)
 
     @get("/players")
     async def list_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:

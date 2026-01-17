@@ -272,3 +272,7 @@ async def miniverse_kick_player(miniverse: Miniverse, player_id: str, reason: st
 async def miniverse_ban_player(miniverse: Miniverse, player_id: str, reason: str):
     async with server_status_manager.get_ws_connection(miniverse.id) as ws:
         await server_status_manager.ban_player(ws, player_id, reason)
+
+async def miniverse_unban_player(miniverse: Miniverse, player_id: str):
+    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
+        await server_status_manager.unban_player(ws, player_id)

@@ -8,9 +8,9 @@ from websockets import ClientConnection
 from app import logger
 from app.core import root_store, settings
 from app.core.utils import websocket_uri_from_miniverse_id
-from app.events.miniverse_event import publish_miniverse_players_event
+from app.events.miniverse_event import publish_miniverse_players_event, publish_miniverse_ban_player_event
 from app.models import Miniverse
-from app.schemas import Player, MSMPPlayer, MSMPOperator
+from app.schemas import Player, MSMPPlayer, MSMPOperator, MSMPPlayerBan
 
 server_status_store = root_store.with_namespace("server-status")
 
@@ -67,6 +67,13 @@ class ServerStatusManager:
         return [MSMPOperator.from_dict(o) for o in operators_list]
 
     @staticmethod
+    async def refresh_msmp_banned_players_list(miniverse_id: str, ws: ClientConnection) -> list[MSMPPlayerBan]:
+        await ws.send(json.dumps({"method": "minecraft:bans", "id": 1}))
+        bans = [MSMPPlayerBan.from_dict(p) for p in json.loads(await ws.recv()).get("result", [])]
+        await server_status_store.set(f"{miniverse_id}.bans", json.dumps([p.to_dict() for p in bans]))
+        return bans
+
+    @staticmethod
     async def get_players_list(miniverse_id: str, ws: ClientConnection) -> list[Player]:
         await ws.send(json.dumps({"method": "minecraft:players", "id": 1}))
         msmp_players_list = [MSMPPlayer(**p) for p in json.loads(await ws.recv()).get("result", [])]
@@ -116,6 +123,12 @@ class ServerStatusManager:
         await ws.send(json.dumps({"method": "minecraft:bans/add", "id": 1, "params": [[data]]}))
         await ws.recv()
 
+    @staticmethod
+    async def unban_player(ws: ClientConnection, player_id: str):
+        data = {'id': player_id}
+        await ws.send(json.dumps({"method": "minecraft:bans/remove", "id": 1, "params": [[data]]}))
+        await ws.recv()
+
 
     async def _run_client(self, miniverse_id: str):
         while True: # TODO: Never use while True, this code must timeout after 10min and check each loop if the container we want to connect still exist
@@ -125,6 +138,8 @@ class ServerStatusManager:
                     logger.info(f"Successfully connected to management server for miniverse {miniverse_id}")
 
                     await self.refresh_msmp_operators_list(miniverse_id, ws)
+                    await self.refresh_msmp_banned_players_list(miniverse_id, ws)
+
                     players_list = await self.get_players_list(miniverse_id, ws)
                     publish_miniverse_players_event(miniverse_id, players_list)
 
@@ -158,6 +173,11 @@ class ServerStatusManager:
                 await self.refresh_msmp_operators_list(miniverse_id, ws)
                 players_list = await self.get_players_list(miniverse_id, ws)
                 publish_miniverse_players_event(miniverse_id, players_list)
+
+        elif method in ["minecraft:notification/bans/added", "minecraft:notification/bans/removed"]:
+            async with self.get_ws_connection(miniverse_id) as ws:
+                banned_players = await self.refresh_msmp_banned_players_list(miniverse_id, ws)
+                publish_miniverse_ban_player_event(miniverse_id, banned_players)
 
         elif method == "minecraft:notification/server/saving":
             logger.info(f"Server save started for miniverse {miniverse_id}")

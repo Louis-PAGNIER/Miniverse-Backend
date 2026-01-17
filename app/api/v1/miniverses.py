@@ -10,11 +10,12 @@ from app.enums import Role
 from app.managers import server_status_manager
 from app.managers.ServerStatusManager import server_status_store
 from app.models import Miniverse, Mod, User
-from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod
+from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod, \
+    MSMPPlayerBan
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
     start_miniverse, stop_miniverse, restart_miniverse, update_miniverse, miniverse_set_player_operator, \
-    miniverse_kick_player, miniverse_ban_player
+    miniverse_kick_player, miniverse_ban_player, miniverse_unban_player
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
     automatic_mod_install
 
@@ -145,7 +146,7 @@ class MiniversesController(Controller):
         return await list_possible_mod_updates(miniverse)
 
     @get("/players")
-    async def list_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:
+    async def list_all_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:
         miniverses = await get_miniverses(db)
         miniverses = [m for m in miniverses if current_user.get_miniverse_role(m.id) >= Role.USER]
 
@@ -156,6 +157,25 @@ class MiniversesController(Controller):
                 continue
 
             json_raw = await server_status_store.get(f"{miniverse.id}.players")
+            if json_raw is None:
+                result[miniverse.id] = []
+            else:
+                result[miniverse.id] = json.loads(json_raw)
+
+        return result
+
+    @get("/players/banned")
+    async def list_all_banned_players(self, current_user: User, db: AsyncSession) -> dict[str, list[MSMPPlayerBan]]:
+        miniverses = await get_miniverses(db)
+        miniverses = [m for m in miniverses if current_user.get_miniverse_role(m.id) >= Role.USER]
+
+        result: dict[str, list[MSMPPlayerBan]] = {}
+        for miniverse in miniverses:
+            if not miniverse.started:
+                result[miniverse.id] = []
+                continue
+
+            json_raw = await server_status_store.get(f"{miniverse.id}.bans")
             if json_raw is None:
                 result[miniverse.id] = []
             else:
@@ -189,3 +209,11 @@ class MiniversesController(Controller):
 
         miniverse = await get_miniverse(miniverse_id, db)
         await miniverse_ban_player(miniverse, player_id, reason)
+
+    @post("/{miniverse_id:str}/unban")
+    async def unban_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to unban players in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        await miniverse_unban_player(miniverse, player_id)

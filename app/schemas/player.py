@@ -12,6 +12,30 @@ class MSMPPlayer:
     name: str
 
 @dataclass
+class MSMPPlayerBan:
+    reason: str
+    expires: str
+    source: str
+    player: MSMPPlayer
+
+    @staticmethod
+    def from_dict(data: dict):
+        return MSMPPlayerBan(
+            reason=data.get('reason'),
+            expires=data.get('expires'),
+            source=data.get('source'),
+            player=MSMPPlayer(**data['player'])
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            'reason': self.reason,
+            'expires': self.expires,
+            'source': self.source,
+            'player': self.player.__dict__
+        }
+
+@dataclass
 class MSMPOperator:
     permissionLevel: int
     bypassesPlayerLimit: bool

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from app.core import channels_plugin, settings
 from app.enums.event_type import EventType
 from app.models import MiniverseUserRole
-from app.schemas import Player
+from app.schemas import Player, MSMPPlayerBan
 
 
 @dataclass
@@ -33,6 +33,14 @@ def publish_miniverse_players_event(miniverse_id: str, players: list[Player]) ->
         type=EventType.PLAYERS,
         miniverse_id=miniverse_id,
         data=players),
+        settings.REDIS_CHANNEL_NAME)
+
+
+def publish_miniverse_ban_player_event(miniverse_id: str, bans: list[MSMPPlayerBan]) -> None:
+    channels_plugin.publish(MiniverseEvent(
+        type=EventType.PLAYER_BAN,
+        miniverse_id=miniverse_id,
+        data=bans),
         settings.REDIS_CHANNEL_NAME)
 
 

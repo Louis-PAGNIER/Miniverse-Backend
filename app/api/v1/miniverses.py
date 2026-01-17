@@ -7,12 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.enums import Role
+from app.managers import server_status_manager
 from app.managers.ServerStatusManager import server_status_store
 from app.models import Miniverse, Mod, User
 from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
-    start_miniverse, stop_miniverse, restart_miniverse, update_miniverse
+    start_miniverse, stop_miniverse, restart_miniverse, update_miniverse, miniverse_set_player_operator, \
+    miniverse_kick_player, miniverse_ban_player
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
     automatic_mod_install
 
@@ -160,3 +162,30 @@ class MiniversesController(Controller):
                 result[miniverse.id] = json.loads(json_raw)
 
         return result
+
+    @post("/{miniverse_id:str}/operator")
+    async def set_operator(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
+                           value: bool = True) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to set operators in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        await miniverse_set_player_operator(miniverse, player_id, value)
+
+    @post("/{miniverse_id:str}/kick")
+    async def kick_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
+                          reason: str = 'You have been kicked by an administrator') -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to kick players in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        await miniverse_kick_player(miniverse, player_id, reason)
+
+    @post("/{miniverse_id:str}/ban")
+    async def ban_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
+                          reason: str = 'You have been banned by an administrator') -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to ban players in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+        await miniverse_ban_player(miniverse, player_id, reason)

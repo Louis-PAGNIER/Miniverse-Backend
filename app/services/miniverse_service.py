@@ -259,3 +259,16 @@ async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncS
     await start_miniverse(miniverse, db)
 
     return miniverse
+
+
+async def miniverse_set_player_operator(miniverse: Miniverse, player_id: str, operator: bool):
+    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
+        await server_status_manager.set_player_operator(miniverse.id, ws, player_id, operator)
+
+async def miniverse_kick_player(miniverse: Miniverse, player_id: str, reason: str):
+    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
+        await server_status_manager.kick_player(ws, player_id, reason)
+
+async def miniverse_ban_player(miniverse: Miniverse, player_id: str, reason: str):
+    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
+        await server_status_manager.ban_player(ws, player_id, reason)

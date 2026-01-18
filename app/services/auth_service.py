@@ -1,44 +1,62 @@
 from typing import Any
 
-import bcrypt
+from keycloak import KeycloakOpenID
 from litestar import Request
 from litestar.connection import ASGIConnection
 from litestar.exceptions import NotAuthorizedException
 from litestar.handlers import BaseRouteHandler
-from litestar.security.jwt import Token, OAuth2PasswordBearerAuth
+from litestar.security.jwt import Token, JWTAuth
 
 from app import get_db_session
 from app.core import settings
 from app.models import User
+from app.services.user_service import create_user
 
 
-def get_password_hash(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+def get_keycloak_openid():
+    return KeycloakOpenID(server_url=settings.KEYCLOAK_ISSUER,
+                          client_id=settings.KEYCLOAK_CLIENT_ID,
+                          realm_name=settings.KEYCLOAK_REALM)
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
-async def retrieve_user_handler(token: Token, connection: ASGIConnection[Any, Any, Any, Any]) -> User | None:
+def get_keycloak_public_key():
+    """
+    Retrieves the public key from the Keycloak OpenID provider.
+
+    Returns:
+        str: The public key in PEM format.
+    """
+    keycloak_openid = get_keycloak_openid()
+    return "-----BEGIN PUBLIC KEY-----\n" + keycloak_openid.public_key() + "\n-----END PUBLIC KEY-----\n"
+
+
+async def retrieve_user_handler(token: Token, _: ASGIConnection[Any, Any, Any, Any]) -> User | None:
     async for session in get_db_session():
-        return await session.get(User, token.sub)
+        user = await session.get(User, token.sub)
+        if user is None:
+            user = await create_user(token.sub, token.extras["preferred_username"], session)
+
+        return user if user.is_active else None  # TODO Return special error so front display some "need activation" or "token expired"
     return None
+
 
 async def get_current_user(request: Request[User, Token, Any]) -> User:
     return request.user
+
 
 def admin_user_guard(connection: ASGIConnection, _: BaseRouteHandler) -> None:
     if not connection.user.is_admin:
         raise NotAuthorizedException()
 
+
 def moderator_user_guard(connection: ASGIConnection, _: BaseRouteHandler) -> None:
     if not connection.user.is_moderator:
         raise NotAuthorizedException()
 
-oauth2_auth = OAuth2PasswordBearerAuth[User](
+
+jwtAuth = JWTAuth[User](
     retrieve_user_handler=retrieve_user_handler,
-    token_secret=settings.JWT_SECRET,
-    token_url="/api/login",
-    exclude=["/api/login", "/docs"],  # TODO: /api/login redundant ?
-    samesite="none",
-    secure=True
+    token_secret=get_keycloak_public_key(),
+    algorithm="RS256",
+    exclude=["/docs"]
 )

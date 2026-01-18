@@ -8,9 +8,10 @@ services:
       REQUIRE_AUTH: "false"
     networks:
       - miniverse-net
-      - redis-net
+      - backend-net
     depends_on:
       - redis
+      - keycloak
     restart: unless-stopped
     stop_grace_period: 2m
 
@@ -23,7 +24,7 @@ services:
     volumes:
       - redis-data:/data
     networks:
-      - redis-net
+      - backend-net
     restart: unless-stopped
 
   mysql-keycloak:
@@ -39,7 +40,7 @@ services:
     volumes:
       - mysql-keycloak-data:/var/lib/mysql
     networks:
-      - mysql-keycloak-net
+      - backend-net
     restart: unless-stopped
 
   keycloak:
@@ -62,7 +63,7 @@ services:
     volumes:
       - ./keycloak/import/:/opt/keycloak/data/import/
     networks:
-      - mysql-keycloak-net
+      - backend-net
     depends_on:
       - mysql-keycloak
     restart: unless-stopped
@@ -70,8 +71,7 @@ services:
 networks:
   miniverse-net:
     name: miniverse-net
-  redis-net:
-  mysql-keycloak-net:
+  backend-net:
 
 volumes:
   redis-data:

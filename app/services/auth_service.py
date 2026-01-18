@@ -5,7 +5,7 @@ from litestar import Request
 from litestar.connection import ASGIConnection
 from litestar.exceptions import NotAuthorizedException
 from litestar.handlers import BaseRouteHandler
-from litestar.security.jwt import Token, JWTAuth
+from litestar.security.jwt import Token, JWTCookieAuth
 
 from app import get_db_session
 from app.core import settings
@@ -54,7 +54,7 @@ def moderator_user_guard(connection: ASGIConnection, _: BaseRouteHandler) -> Non
         raise NotAuthorizedException()
 
 
-jwtAuth = JWTAuth[User](
+jwtAuth = JWTCookieAuth[User](
     retrieve_user_handler=retrieve_user_handler,
     token_secret=get_keycloak_public_key(),
     algorithm="RS256",

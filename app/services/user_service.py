@@ -2,13 +2,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import logger
+from app.enums import Role
 from app.models.user import User
-from app.schemas import UserCreate
-from app.services.auth_service import get_password_hash
 
-async def create_user(user: UserCreate, db: AsyncSession) -> User:
-    logger.info(f"Creating user {user.username} with role {user.role}")
-    db_user = User(username=user.username, hashed_password=get_password_hash(user.password), role=user.role)
+
+async def create_user(userid: str, username: str, db: AsyncSession) -> User:
+    logger.info(f"Creating user {username}")
+    is_users_empty = (await db.execute(select(User.id).limit(1))).first() is None
+    if is_users_empty:
+        db_user = User(id=userid, is_active=True, username=username, role=Role.ADMIN)
+    else:
+        db_user = User(id=userid, username=username)
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)

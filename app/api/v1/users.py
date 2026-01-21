@@ -1,12 +1,11 @@
-from litestar import get, post, Controller
+from litestar import get, Controller
 from litestar.di import Provide
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.models import User
-from app.schemas import UserCreate
-from app.services.auth_service import get_current_user, admin_user_guard
-from app.services.user_service import create_user, get_users, get_user
+from app.services.auth_service import get_current_user
+from app.services.user_service import get_users, get_user
 
 
 class UsersController(Controller):
@@ -28,7 +27,3 @@ class UsersController(Controller):
     @get("/me")
     async def get_me(self, current_user: User) -> User:
         return current_user
-
-    @post("/", guards=[admin_user_guard])
-    async def create_user(self, data: UserCreate, db: AsyncSession) -> User:
-        return await create_user(data, db)

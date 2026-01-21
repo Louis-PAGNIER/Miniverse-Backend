@@ -15,9 +15,11 @@ class Settings(BaseSettings):
     DOCKER_NETWORK_NAME: str = "miniverse-net"
     REDIS_HOST_NAME: str = "miniverse-redis"
     REDIS_CHANNEL_NAME: str = "miniverse-updates"
+    KEYCLOAK_ISSUER: str = "http://keycloak:8080/"
+    KEYCLOAK_REALM: str = "miniverse"
+    KEYCLOAK_CLIENT_ID: str = "miniverse-client"
 
 
 settings = Settings()
-# TODO: check if HOST_DATA_PATH is valid (is not None + does path exist + is dir)
 # Ensure the data path exists
 settings.DATA_PATH.mkdir(parents=True, exist_ok=True)

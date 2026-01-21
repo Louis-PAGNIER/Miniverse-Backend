@@ -11,20 +11,17 @@ from litestar.types import HTTPScope
 
 from app import logger
 from app.api.v1 import UsersController, MiniversesController, ModsController
-from app.api.v1 import oauth2_auth, login
 from app.api.v1.files import FilesController
 from app.api.v1.minecraft import MinecraftController
 from app.api.v1.websockets import websocket_miniverse_updates_handler, websocket_miniverse_logs_handler
 from app.core.channels import channels_plugin
 from app.db import Base
 from app.db.session import session_config
-from app.enums import Role
 from app.managers.ServerStatusManager import server_status_manager
-from app.schemas.user import UserCreate
+from app.services.auth_service import jwtAuth
 from app.services.docker_service import dockerctl
 from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
 from app.services.proxy_service import start_proxy_containers, update_proxy_config, stop_proxy_containers
-from app.services.user_service import get_user_by_username, create_user
 
 
 async def proxy_startup():
@@ -35,14 +32,6 @@ async def proxy_startup():
 async def db_startup():
     async with session_config.get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    async with session_config.get_session() as session:
-        # Create initial admin user if not exists
-        admin_username = "Louis"
-        admin_password = "1234"
-        admin_user = await get_user_by_username(admin_username, session)
-        if not admin_user:
-            await create_user(UserCreate(admin_username, admin_password, Role.ADMIN), session)
 
 
 async def server_status_manager_startup():
@@ -90,11 +79,11 @@ cors_config = CORSConfig(allow_origins=["*"], allow_credentials=True)  # TODO: d
 app = Litestar(
     cors_config=cors_config,
     response_cache_config=response_cache_config,
-    route_handlers=[login, UsersController, MiniversesController, FilesController, ModsController, MinecraftController,
+    route_handlers=[UsersController, MiniversesController, FilesController, ModsController, MinecraftController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
-    on_startup=[db_startup, docker_startup, proxy_startup, server_status_manager_startup],
+    on_startup=[db_startup, proxy_startup, docker_startup, server_status_manager_startup],
     on_shutdown=[docker_shutdown],  # TODO: Do we really need to shutdown all containers ?
-    on_app_init=[oauth2_auth.on_app_init],
+    on_app_init=[jwtAuth.on_app_init],
     openapi_config=OpenAPIConfig(
         title="Miniverse API",
         version="0.0.1",

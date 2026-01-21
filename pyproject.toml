@@ -28,6 +28,7 @@ dependencies = [
     "python-socks (==2.7.2)",
     "aiodocker (>=0.24.0,<0.25.0)",
     "zipstream-new (>=1.1.8,<2.0.0)",
+    "python-keycloak (==7.0.2)",
 ]
 
 

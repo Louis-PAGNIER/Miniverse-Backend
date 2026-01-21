@@ -36,7 +36,14 @@ async def retrieve_user_handler(token: Token, _: ASGIConnection[Any, Any, Any, A
         if user is None:
             user = await create_user(token.sub, token.extras["preferred_username"], session)
 
-        return user if user.is_active else None  # TODO Return special error so front display some "need activation" or "token expired"
+        if not user.is_active:
+            return None
+
+        if user.username != token.extras["preferred_username"]:
+            user.username = token.extras["preferred_username"]
+            await session.commit()
+
+        return user  # TODO Return special error so front display some "need activation" or "token expired"
     return None
 
 

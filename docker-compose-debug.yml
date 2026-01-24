@@ -10,6 +10,7 @@ services:
       - miniverse-net
       - backend-net
     depends_on:
+      - mysql
       - redis
       - keycloak
     restart: unless-stopped
@@ -27,18 +28,17 @@ services:
       - backend-net
     restart: unless-stopped
 
-  mysql-keycloak:
-    container_name: mysql-keycloak
-    image: mysql:9.5.0
+  mysql:
+    container_name: mysql
+    build: mysql/
     ports:
       - "127.0.0.1:3306:3306" # Removed in prod
     environment:
-      MYSQL_ROOT_PASSWORD: ${KC_MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: keycloak
-      MYSQL_USER: keycloak-db-user
-      MYSQL_PASSWORD: ${KC_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MINIVERSE_DB_PASS: ${MINIVERSE_DB_PASS}
+      KEYCLOAK_DB_PASS: ${KEYCLOAK_DB_PASS}
     volumes:
-      - mysql-keycloak-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
     networks:
       - backend-net
     restart: unless-stopped
@@ -51,13 +51,13 @@ services:
       --optimized
       --import-realm
     environment:
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASS}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
     networks:
       - backend-net
     depends_on:
-      - mysql-keycloak
+      - mysql
     restart: unless-stopped
 
   nginx:
@@ -73,7 +73,7 @@ services:
     develop:
       watch:
         - action: sync+restart
-          path: nginx/conf
+          path: nginx/conf/
           target: /etc/nginx/
     restart: unless-stopped
 
@@ -84,4 +84,4 @@ networks:
 
 volumes:
   redis-data:
-  mysql-keycloak-data:
+  mysql-data:

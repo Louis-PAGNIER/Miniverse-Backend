@@ -1,6 +1,8 @@
+import time
 from typing import Any
 
 from keycloak import KeycloakOpenID
+from keycloak import exceptions
 from litestar import Request
 from litestar.connection import ASGIConnection
 from litestar.exceptions import NotAuthorizedException
@@ -27,7 +29,16 @@ def get_keycloak_public_key():
         str: The public key in PEM format.
     """
     keycloak_openid = get_keycloak_openid()
-    return "-----BEGIN PUBLIC KEY-----\n" + keycloak_openid.public_key() + "\n-----END PUBLIC KEY-----\n"
+
+    error: exceptions.KeycloakConnectionError | None = None
+    for i in range(20):
+        try:
+            return "-----BEGIN PUBLIC KEY-----\n" + keycloak_openid.public_key() + "\n-----END PUBLIC KEY-----\n"
+        except exceptions.KeycloakConnectionError as e:
+            print(f"Waiting keycloak connection, retrying in 3 seconds... ({i + 1})")
+            error = e
+        time.sleep(3)
+    raise error
 
 
 async def retrieve_user_handler(token: Token, _: ASGIConnection[Any, Any, Any, Any]) -> User | None:

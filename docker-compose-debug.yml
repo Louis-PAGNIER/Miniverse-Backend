@@ -1,5 +1,5 @@
 services:
-  miniverse-api-proxy:
+  miniverse-api:
     image: serjs/go-socks5-proxy
     container_name: miniverse-api-proxy
     ports:
@@ -45,27 +45,36 @@ services:
 
   keycloak:
     container_name: keycloak
-    image: quay.io/keycloak/keycloak:26.5.0
+    build: keycloak/
     command:
       start
+      --optimized
       --import-realm
-    ports:
-      - "127.0.0.1:8080:8080"
     environment:
-      KC_HTTP_ENABLED: true
-      KC_HOSTNAME: ${KC_HOSTNAME}
-      KC_DB: mysql
-      KC_DB_URL: jdbc:mysql://mysql-keycloak/keycloak
-      KC_DB_USERNAME: keycloak-db-user
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
-    volumes:
-      - ./keycloak/import/:/opt/keycloak/data/import/
     networks:
       - backend-net
     depends_on:
       - mysql-keycloak
+    restart: unless-stopped
+
+  nginx:
+    container_name: nginx
+    build: nginx/
+    ports:
+      - "80:80"
+    networks:
+      backend-net:
+    depends_on:
+      - miniverse-api
+      - keycloak
+    develop:
+      watch:
+        - action: sync+restart
+          path: nginx/conf
+          target: /etc/nginx/
     restart: unless-stopped
 
 networks:

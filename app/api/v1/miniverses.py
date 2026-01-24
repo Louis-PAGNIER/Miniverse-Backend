@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.enums import Role
-from app.managers import server_status_manager
 from app.managers.ServerStatusManager import server_status_store
 from app.models import Miniverse, Mod, User
 from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod, \
@@ -89,7 +88,8 @@ class MiniversesController(Controller):
         return miniverse
 
     @post("/{miniverse_id:str}/update_mc_version")
-    async def update_miniverse(self, current_user: User, miniverse_id: str, data: MiniverseUpdateMCVersion, db: AsyncSession) -> Miniverse:
+    async def update_miniverse(self, current_user: User, miniverse_id: str, data: MiniverseUpdateMCVersion,
+                               db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
             raise NotAuthorizedException("You are not authorized to update this miniverse")
 
@@ -100,7 +100,8 @@ class MiniversesController(Controller):
         return await update_miniverse(miniverse, data.mc_version, db)
 
     @post("/{miniverse_id:str}/install/mod")
-    async def automatic_install_mod(self, current_user: User, miniverse_id: str, data: AutomaticInstallMod, db: AsyncSession) -> Mod:
+    async def automatic_install_mod(self, current_user: User, miniverse_id: str, data: AutomaticInstallMod,
+                                    db: AsyncSession) -> Mod:
         if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
             raise NotAuthorizedException("You are not authorized to install mods in this miniverse")
 
@@ -137,7 +138,8 @@ class MiniversesController(Controller):
         return await update_mod(mod, new_version_id, db)
 
     @get("/{miniverse_id:str}/mods/updates")
-    async def list_mod_updates(self, current_user: User, miniverse_id: str, db: AsyncSession) -> dict[str, ModUpdateInfo]:
+    async def list_mod_updates(self, current_user: User, miniverse_id: str, db: AsyncSession) -> dict[
+        str, ModUpdateInfo]:
         if current_user.get_miniverse_role(miniverse_id) < Role.USER:
             raise NotAuthorizedException("You are not authorized to view mod updates in this miniverse")
 
@@ -203,7 +205,7 @@ class MiniversesController(Controller):
 
     @post("/{miniverse_id:str}/ban")
     async def ban_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
-                          reason: str = 'You have been banned by an administrator') -> None:
+                         reason: str = 'You have been banned by an administrator') -> None:
         if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
             raise NotAuthorizedException("You are not authorized to ban players in this miniverse")
 

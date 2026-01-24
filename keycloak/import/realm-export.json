@@ -316,18 +316,20 @@
       "clientId": "miniverse-client",
       "name": "Miniverse app",
       "description": "",
-      "rootUrl": "https://localhost:5173/",
-      "adminUrl": "https://localhost:5173/",
-      "baseUrl": "https://localhost:5173/",
+      "rootUrl": "http://localhost/",
+      "adminUrl": "http://localhost/",
+      "baseUrl": "http://localhost/",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://localhost:5173/*"
+        "https://localhost:5173/*",
+        "http://localhost/*"
       ],
       "webOrigins": [
-        "https://localhost:5173"
+        "https://localhost:5173",
+        "http://localhost"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -1229,14 +1231,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-sha256-pairwise-sub-mapper",
-            "oidc-usermodel-property-mapper",
-            "saml-user-attribute-mapper",
-            "saml-user-property-mapper",
-            "oidc-full-name-mapper",
-            "saml-role-list-mapper",
             "oidc-usermodel-attribute-mapper",
-            "oidc-address-mapper"
+            "saml-user-attribute-mapper",
+            "saml-role-list-mapper",
+            "oidc-sha256-pairwise-sub-mapper",
+            "oidc-address-mapper",
+            "oidc-full-name-mapper",
+            "oidc-usermodel-property-mapper",
+            "saml-user-property-mapper"
           ]
         }
       },
@@ -1276,14 +1278,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-address-mapper",
-            "oidc-usermodel-property-mapper",
-            "saml-user-property-mapper",
+            "saml-role-list-mapper",
             "oidc-usermodel-attribute-mapper",
-            "oidc-full-name-mapper",
+            "oidc-usermodel-property-mapper",
+            "oidc-address-mapper",
+            "saml-user-property-mapper",
             "saml-user-attribute-mapper",
             "oidc-sha256-pairwise-sub-mapper",
-            "saml-role-list-mapper"
+            "oidc-full-name-mapper"
           ]
         }
       },

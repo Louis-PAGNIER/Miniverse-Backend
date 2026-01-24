@@ -4,6 +4,7 @@ from litestar.dto import dto_field
 from sqlalchemy import String, Text, Enum, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core import settings
 from app.db import Base
 from app.enums import MiniverseType
 from app.models.mod import Mod
@@ -12,13 +13,14 @@ from app.models.mod import Mod
 class Miniverse(Base):
     __tablename__ = "miniverses"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()), info=dto_field("read-only"))
-    name: Mapped[str] = mapped_column(String)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()),
+                                    info=dto_field("read-only"))
+    name: Mapped[str] = mapped_column(String(settings.DATABASE_DEFAULT_STRING_LENGTH))
     type: Mapped[MiniverseType] = mapped_column(Enum(MiniverseType), info=dto_field("read-only"))
     description: Mapped[str | None] = mapped_column(Text)
-    container_id: Mapped[str | None] = mapped_column(String, info=dto_field("private"))
-    mc_version: Mapped[str] = mapped_column(String, info=dto_field("read-only"))
-    subdomain: Mapped[str] = mapped_column(String, info=dto_field("read-only"))
+    container_id: Mapped[str | None] = mapped_column(String(64), info=dto_field("private"))
+    mc_version: Mapped[str] = mapped_column(String(64), info=dto_field("read-only"))
+    subdomain: Mapped[str] = mapped_column(String(settings.DATABASE_DEFAULT_STRING_LENGTH), info=dto_field("read-only"))
     is_on_lite_proxy: Mapped[bool] = mapped_column(Boolean, info=dto_field("read-only"))
     started: Mapped[bool] = mapped_column(Boolean, default=False, info=dto_field("read-only"))
     management_server_secret: Mapped[str | None] = mapped_column(String(length=40), info=dto_field("private"))

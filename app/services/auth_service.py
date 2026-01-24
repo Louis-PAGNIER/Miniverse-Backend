@@ -31,7 +31,7 @@ def get_keycloak_public_key():
     keycloak_openid = get_keycloak_openid()
 
     error: exceptions.KeycloakConnectionError | None = None
-    for i in range(20):
+    for i in range(5):
         try:
             return "-----BEGIN PUBLIC KEY-----\n" + keycloak_openid.public_key() + "\n-----END PUBLIC KEY-----\n"
         except exceptions.KeycloakConnectionError as e:

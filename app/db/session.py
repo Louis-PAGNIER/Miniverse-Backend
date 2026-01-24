@@ -7,8 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import settings
 from app.db import Base
 
-SQLALCHEMY_DATABASE_URL = f"sqlite+aiosqlite:///{settings.SQLALCHEMY_DATABASE_PATH}"
-
+SQLALCHEMY_DATABASE_URL: str = f"mysql+aiomysql://miniverse_db_user:{settings.SQLALCHEMY_DATABASE_PASSWORD}@{settings.SQLALCHEMY_DATABASE_PATH}"
 session_config = SQLAlchemyAsyncConfig(
     connection_string=SQLALCHEMY_DATABASE_URL,
     create_all=True,

@@ -6,12 +6,12 @@ from pydantic_settings import BaseSettings
 # Some settings have default values
 class Settings(BaseSettings):
     PROXY_SOCKS: str | None = None
-    JWT_SECRET: str
     PROXY_SECRET: str
     HOST_DATA_PATH: Path
     DATA_PATH: Path = "/app/data"
-    SQLALCHEMY_DATABASE_PATH: Path = "/app/data/database.db"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    SQLALCHEMY_DATABASE_PATH: str = "mysql/miniverse_db"
+    SQLALCHEMY_DATABASE_PASSWORD: str
+    DATABASE_DEFAULT_STRING_LENGTH: int = 128
     DOCKER_NETWORK_NAME: str = "miniverse-net"
     REDIS_HOST_NAME: str = "miniverse-redis"
     REDIS_CHANNEL_NAME: str = "miniverse-updates"

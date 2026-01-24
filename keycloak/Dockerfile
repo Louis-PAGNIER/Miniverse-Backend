@@ -21,8 +21,8 @@ COPY --from=builder /opt/keycloak/ /opt/keycloak/
 
 # change these values to point to a running postgres instance
 ENV KC_DB=mysql
-ENV KC_DB_URL=jdbc:mysql://mysql-keycloak/keycloak
-ENV KC_DB_USERNAME=keycloak-db-user
+ENV KC_DB_URL=jdbc:mysql://mysql/keycloak_db
+ENV KC_DB_USERNAME=keycloak_db_user
 
 ENV KC_HTTP_ENABLED=true
 ENV KC_HOSTNAME_STRICT=false

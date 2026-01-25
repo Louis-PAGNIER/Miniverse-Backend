@@ -12,9 +12,6 @@ RUN git clone -b ${BRANCH} ${REPO_URL} .
 RUN npm install
 RUN npm run build
 
-FROM quay.io/keycloak/keycloak:26.5.0
-
-
 FROM nginx:1.29.4
 
 COPY conf/nginx.conf /etc/nginx/nginx.conf

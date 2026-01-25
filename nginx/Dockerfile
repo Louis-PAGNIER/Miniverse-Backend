@@ -7,6 +7,8 @@ WORKDIR /html
 ARG REPO_URL=https://github.com/Louis-PAGNIER/Miniverse
 ARG BRANCH=main
 
+ADD https://api.github.com/repos/Louis-PAGNIER/Miniverse/commits/${BRANCH} /dev/null
+
 RUN git clone -b ${BRANCH} ${REPO_URL} .
 
 RUN npm install

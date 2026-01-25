@@ -1,5 +1,7 @@
 # Miniverse-Backend
 
+Miniverse frontend repo : https://github.com/Louis-PAGNIER/Miniverse
+
 ## Running project :
 
 ### Prod:

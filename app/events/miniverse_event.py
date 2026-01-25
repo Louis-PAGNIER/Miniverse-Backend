@@ -25,7 +25,7 @@ class MiniverseEvent:
 
 
 def user_list_from_user_role_list(user_roles: list[MiniverseUserRole]) -> list[str]:
-    return list(map(lambda user_role: user_role.user_id, user_roles))
+    return [user_role.user_id for user_role in user_roles]
 
 
 def publish_miniverse_players_event(miniverse_id: str, players: list[Player]) -> None:

@@ -31,7 +31,8 @@ async def handle_miniverse_channel_message(message: bytes,
     event = MiniverseEvent.from_bytes(message)
 
     if event.updated_user_ids is not None and ctx.user.id in event.updated_user_ids:
-        ctx.user = await get_user(socket.user.id, db)
+        await db.rollback()
+        await db.refresh(ctx.user)
 
         # Hacky way of sending deleted event only to correct users
         if event.type == EventType.DELETED:
@@ -45,7 +46,7 @@ async def handle_miniverse_channel_message(message: bytes,
 @websocket("/ws/miniverse", dependencies={"db": Provide(get_db_session)})
 async def websocket_miniverse_updates_handler(socket: WebSocket, channels: ChannelsPlugin, db: AsyncSession) -> None:
     await socket.accept()
-    ctx = WebsocketContext(socket.user)
+    ctx = WebsocketContext(await get_user(socket.user.id, db))
     try:
         async with channels.start_subscription(
                 [settings.REDIS_CHANNEL_NAME]) as subscriber, subscriber.run_in_background(

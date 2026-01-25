@@ -15,7 +15,7 @@ def generate_main_proxy_config(miniverse_list: list[Miniverse]) -> dict:
                 "enabled": True,
                 "routes": [
                     {
-                        "host": f"{miniverse.subdomain}.miniverse.fr",
+                        "host": f"{miniverse.subdomain}.miniverse.fr",  # TODO create env vars for domain name
                         "backend": f"miniverse-{miniverse.id}:25565",
                         "cachePingTTL": "-1s",
                         "fallback": {

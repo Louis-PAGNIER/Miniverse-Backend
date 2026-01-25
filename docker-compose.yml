@@ -74,8 +74,13 @@ services:
       context: nginx/
       args:
         - BRANCH=${GIT_BRANCH:-main}
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+    volumes:
+      - ${HOST_DATA_PATH}/certs/:/etc/nginx/ssl/
     ports:
       - "80:80"
+      - "443:443"
     networks:
       backend-net:
     depends_on:

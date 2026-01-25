@@ -316,20 +316,20 @@
       "clientId": "miniverse-client",
       "name": "Miniverse app",
       "description": "",
-      "rootUrl": "http://localhost/",
-      "adminUrl": "http://localhost/",
-      "baseUrl": "http://localhost/",
+      "rootUrl": "https://localhost/",
+      "adminUrl": "https://localhost/",
+      "baseUrl": "https://localhost/",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://localhost:5173/*",
-        "http://localhost/*"
+        "https://localhost/*",
+        "https://localhost:5173/*"
       ],
       "webOrigins": [
-        "https://localhost:5173",
-        "http://localhost"
+        "https://localhost",
+        "https://localhost:5173"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -372,16 +372,16 @@
       "defaultClientScopes": [
         "web-origins",
         "acr",
-        "roles",
         "profile",
+        "roles",
         "basic",
         "email"
       ],
       "optionalClientScopes": [
         "address",
         "phone",
-        "organization",
         "offline_access",
+        "organization",
         "microprofile-jwt"
       ]
     },
@@ -1231,14 +1231,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
+            "oidc-address-mapper",
+            "oidc-usermodel-property-mapper",
+            "saml-role-list-mapper",
             "oidc-usermodel-attribute-mapper",
             "saml-user-attribute-mapper",
-            "saml-role-list-mapper",
+            "saml-user-property-mapper",
             "oidc-sha256-pairwise-sub-mapper",
-            "oidc-address-mapper",
-            "oidc-full-name-mapper",
-            "oidc-usermodel-property-mapper",
-            "saml-user-property-mapper"
+            "oidc-full-name-mapper"
           ]
         }
       },
@@ -1278,14 +1278,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "saml-role-list-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "oidc-usermodel-property-mapper",
-            "oidc-address-mapper",
+            "oidc-full-name-mapper",
             "saml-user-property-mapper",
+            "oidc-address-mapper",
+            "oidc-usermodel-attribute-mapper",
             "saml-user-attribute-mapper",
+            "saml-role-list-mapper",
             "oidc-sha256-pairwise-sub-mapper",
-            "oidc-full-name-mapper"
+            "oidc-usermodel-property-mapper"
           ]
         }
       },

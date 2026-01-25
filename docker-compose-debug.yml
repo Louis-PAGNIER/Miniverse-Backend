@@ -30,7 +30,10 @@ services:
 
   mysql:
     container_name: mysql
-    build: mysql/
+    build:
+      context: nginx/
+      args:
+        - BRANCH=${GIT_BRANCH:-main}
     ports:
       - "127.0.0.1:3306:3306" # Removed in prod
     environment:

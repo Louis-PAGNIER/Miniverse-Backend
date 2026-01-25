@@ -3,8 +3,16 @@
 ## Running project :
 
 ### Prod:
+
+#### unix
 ```sh
-docker compose up
+docker compose down && GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) docker compose up --build
+```
+
+#### windows
+
+```powershell
+docker compose down; $env:GIT_BRANCH = $( git rev-parse --abbrev-ref HEAD ); docker-compose up --build
 ```
 
 ### Debug:

@@ -5,5 +5,3 @@
 data/
 __pycache__/
 *.db
-
-/nginx/frontend-compiled/

@@ -78,6 +78,7 @@ services:
       - DOMAIN_NAME=${DOMAIN_NAME}
     volumes:
       - ${HOST_DATA_PATH}/certs/:/etc/nginx/ssl/
+      - ${HOST_DATA_PATH}/miniverses/:/data/miniverses/
     ports:
       - "80:80"
       - "443:443"

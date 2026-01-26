@@ -3,13 +3,15 @@ import zipfile
 from copy import copy
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import zipstream
+from litestar import Response
 from litestar.concurrency import sync_to_thread
 from litestar.datastructures import UploadFile
 from litestar.response import File, Stream
 
-from app.core import root_store
+from app.core import root_store, settings
 from app.models import Miniverse
 from app.schemas.fileinfo import FileInfo
 from app.services.miniverse_service import get_miniverse_path
@@ -58,8 +60,8 @@ def get_zip_roots(z: zipfile.ZipFile) -> set[str]:
 
 
 async def _extract_zip(
-    archive_path: Path,
-    extract_dir: Path,
+        archive_path: Path,
+        extract_dir: Path,
 ):
     def extract():
         with zipfile.ZipFile(archive_path) as z:
@@ -93,6 +95,7 @@ async def _extract_zip(
                         dst.write(chunk)
 
     await sync_to_thread(extract)
+
 
 def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo]:
     miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
@@ -154,7 +157,34 @@ def transform_safe_miniverse_files(miniverse: Miniverse, paths: list[Path]):
     return [safe_user_path(miniverse_data_path, p) for p in paths]
 
 
-def download_files(paths: list[Path]) -> File | Stream:
+def add_to_manifest(manifest: list[Any], parent: Path, path: Path):
+    stat = path.stat()
+    nginx_path = path.relative_to(settings.DATA_PATH)
+    zip_path = path.relative_to(parent)
+    manifest.append(f"- {stat.st_size} /internal/{nginx_path.as_posix()} {zip_path}")
+
+
+def download_files(paths: list[Path]) -> Response:
+    if len(paths) == 1:
+        if paths[0].is_file():
+            return File(path=paths[0], filename=paths[0].name)
+
+    manifest = []
+    for path in paths:
+        parent = path.parent
+        if path.is_file():
+            add_to_manifest(manifest, parent, path)
+        elif path.is_dir():
+            for file in path.rglob("*"):
+                if file.is_file():
+                    add_to_manifest(manifest, parent, file)
+
+    response = Response(content="\n".join(manifest) + "\n")
+    response.headers["X-Archive-Files"] = "zip"  # Trigger mod_zip
+    response.headers["Content-Disposition"] = 'attachment; filename="bundle.zip"'  # TODO change this filename
+    response.headers["Content-Type"] = "application/zip"
+    return response
+
     if len(paths) == 1:
         if paths[0].is_file():
             return File(path=paths[0], filename=paths[0].name)
@@ -262,4 +292,3 @@ def rename_file(miniverse: Miniverse, path: Path, new_name: str):
         raise ValueError(f"File {new_path_safe} already exists")
 
     file_to_rename.rename(new_path_safe)
-

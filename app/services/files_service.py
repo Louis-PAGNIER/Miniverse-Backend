@@ -1,5 +1,6 @@
 import shutil
 import zipfile
+import zlib
 from copy import copy
 from datetime import datetime
 from pathlib import Path
@@ -157,14 +158,32 @@ def transform_safe_miniverse_files(miniverse: Miniverse, paths: list[Path]):
     return [safe_user_path(miniverse_data_path, p) for p in paths]
 
 
+def compute_crc32(file_path):
+    crc = 0
+    # We read in 1MB chunks for a good balance between speed and RAM
+    chunk_size = 1024 * 1024
+
+    with open(file_path, 'rb') as f:
+        while True:
+            data = f.read(chunk_size)
+            if not data:
+                break
+            # zlib.crc32(data, starting_crc) allows incremental updates
+            crc = zlib.crc32(data, crc)
+
+    # Convert to unsigned 32-bit hex string (8 characters)
+    return format(crc & 0xFFFFFFFF, '08x')
+
+
 def add_to_manifest(manifest: list[Any], parent: Path, path: Path):
     stat = path.stat()
     nginx_path = path.relative_to(settings.DATA_PATH)
     zip_path = path.relative_to(parent)
-    manifest.append(f"- {stat.st_size} /internal/{nginx_path.as_posix()} {zip_path}")
 
+    crc = compute_crc32(path)
 
-# TODO compute checksum for each files
+    manifest.append(f"{crc} {stat.st_size} /internal/{nginx_path.as_posix()} {zip_path}")
+
 
 def download_files(paths: list[Path]) -> Response:
     if len(paths) == 1:

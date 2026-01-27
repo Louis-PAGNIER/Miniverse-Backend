@@ -1,14 +1,15 @@
-FROM node:25-bullseye AS builder
+FROM nginx:1.29.4-alpine AS nginx-builder
 
 ARG NGINX_VERSION=1.29.4
 
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     git \
     gcc \
     make \
-    libpcre3-dev \
-    zlib1g-dev \
-    libssl-dev \
+    pcre2-dev \
+    zlib-dev \
+    openssl-dev \
+    alpine-sdk \
     wget
 
 # Download Nginx source code (must match the version of the base image)
@@ -17,14 +18,15 @@ RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz && \
 
 # Clone the mod_zip repository
 RUN git clone https://github.com/evanmiller/mod_zip.git
+RUN git clone https://github.com/fdintino/nginx-upload-module.git
 
 # Compile Nginx with the module
 WORKDIR /nginx-${NGINX_VERSION}
-RUN ./configure --with-compat --add-dynamic-module=/mod_zip && \
+RUN ./configure --with-compat --add-dynamic-module=/mod_zip --add-dynamic-module=/nginx-upload-module && \
     make modules
 
+FROM node:25.5.0 AS frontend-builder
 
-# ------------
 # Importing frontend from git
 WORKDIR /html
 
@@ -41,9 +43,12 @@ RUN npm run build
 # Nginx version must match ${NGINX_VERSION} declared above
 FROM nginx:1.29.4-alpine
 
-RUN apk add --no-cache openssl
+# Set uid:gid to 1000:1000 to match backend perms
+RUN apk add --no-cache openssl shadow && usermod -u 1000 nginx && groupmod -g 1000 nginx && apk del shadow
 
-COPY --from=builder /nginx-*/objs/ngx_http_zip_module.so /usr/lib/nginx/modules/
+
+COPY --from=nginx-builder /nginx-*/objs/ngx_http_zip_module.so /usr/lib/nginx/modules/
+COPY --from=nginx-builder /nginx-*/objs/ngx_http_upload_module.so /usr/lib/nginx/modules/
 
 COPY conf/nginx.conf /etc/nginx/nginx.conf
 COPY conf/conf.d/ /etc/nginx/conf.d/
@@ -51,7 +56,7 @@ COPY conf/conf.d/ /etc/nginx/conf.d/
 COPY entrypoint.sh /docker-entrypoint.d/99-generate-cert.sh
 RUN chmod +x /docker-entrypoint.d/99-generate-cert.sh
 
-COPY --from=builder /html/dist/ /usr/share/nginx/html/
+COPY --from=frontend-builder /html/dist/ /usr/share/nginx/html/
 
 EXPOSE 443/tcp
 # Redirect 80 to 443

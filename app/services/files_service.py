@@ -164,6 +164,8 @@ def add_to_manifest(manifest: list[Any], parent: Path, path: Path):
     manifest.append(f"- {stat.st_size} /internal/{nginx_path.as_posix()} {zip_path}")
 
 
+# TODO compute checksum for each files
+
 def download_files(paths: list[Path]) -> Response:
     if len(paths) == 1:
         if paths[0].is_file():

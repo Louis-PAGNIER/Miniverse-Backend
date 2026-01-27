@@ -1,6 +1,3 @@
-import json
-import uuid
-from datetime import timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -19,7 +16,7 @@ from app.schemas.fileinfo import FileInfo, FilesRequest, RenameFileRequest
 from app.services.auth_service import get_current_user
 from app.services.files_service import list_miniverse_files, delete_miniverse_files, copy_miniverse_files, \
     transform_safe_miniverse_files, download_files, upload_miniverse_files, extract_miniverse_archive, rename_file, \
-    compress_miniverse_files, download_tokens_store
+    compress_miniverse_files
 from app.services.miniverse_service import get_miniverse
 
 
@@ -61,37 +58,26 @@ class FilesController(Controller):
 
         return copy_miniverse_files(miniverse, data.paths, destination)
 
-    @post("/{miniverse_id:str}/download-token")
-    async def create_download_miniverse_files_token(
+    @get("/{miniverse_id:str}/download")
+    async def download_files(
             self,
+            paths: str,
             current_user: User,
             miniverse_id: str,
-            data: FilesRequest,
-            db: AsyncSession,
-    ) -> str:
+            db: AsyncSession
+    ) -> Response:
         if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
             raise NotAuthorizedException("You are not authorized to view files in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        safe_paths = transform_safe_miniverse_files(miniverse, data.paths)
 
-        token = uuid.uuid4().hex
-        await download_tokens_store.set(token, json.dumps([str(p) for p in safe_paths]),
-                                        expires_in=timedelta(seconds=30).seconds)
+        paths: list[Path] = [Path(path) for path in paths.split(",")]
+        safe_paths = transform_safe_miniverse_files(miniverse, paths)
 
-        return token
-
-    @get("/download/{token:str}", exclude_from_auth=True)
-    async def download_files(self, token: str) -> Response:
-        data = await download_tokens_store.get(token)
-        if data is None:
-            raise NotAuthorizedException("Invalid token")
-
-        paths: list[Path] = [Path(p) for p in json.loads(data)]
-        if len(paths) <= 0:
+        if len(safe_paths) <= 0:
             raise NotFoundException("Dossier vide")
 
-        return download_files(paths)
+        return download_files(safe_paths)
 
     @post("/{miniverse_id:str}/upload", request_max_body_size=50 * (1024 ** 3))
     async def upload_miniverse_files(

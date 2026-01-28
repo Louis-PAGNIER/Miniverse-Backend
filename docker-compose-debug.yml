@@ -73,6 +73,7 @@ services:
     volumes:
       - ${HOST_DATA_PATH}/certs/:/etc/nginx/ssl/
       - ${HOST_DATA_PATH}/miniverses/:/data/miniverses/
+      - ${HOST_DATA_PATH}/uploads/:/data/uploads/
     ports:
       - "80:80"
       - "443:443"

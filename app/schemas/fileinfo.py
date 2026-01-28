@@ -13,11 +13,19 @@ class FileInfo:
     updated: datetime
     size: Optional[int]
 
+
 @dataclass
 class FilesRequest:
     paths: list[Path]
+
 
 @dataclass
 class RenameFileRequest:
     path: Path
     new_name: str
+
+
+@dataclass
+class NginxUploadData:
+    path: list[Path]
+    name: list[str]

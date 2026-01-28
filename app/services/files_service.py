@@ -9,12 +9,10 @@ from typing import Any
 import zipstream
 from litestar import Response
 from litestar.concurrency import sync_to_thread
-from litestar.datastructures import UploadFile
-from litestar.response import File, Stream
 
 from app.core import root_store, settings
 from app.models import Miniverse
-from app.schemas.fileinfo import FileInfo
+from app.schemas.fileinfo import FileInfo, NginxUploadData
 from app.services.miniverse_service import get_miniverse_path
 
 download_tokens_store = root_store.with_namespace("download-tokens")
@@ -181,9 +179,9 @@ def add_to_manifest(manifest: list[Any], parent: Path, path: Path):
     zip_path = path.relative_to(parent)
 
     crc = "-"
-    if stat.st_size >= 100_000_000:
-        crc = compute_crc32(path)
-    print(stat.st_size)
+    # TODO test if this lines below helps download speed / download retries
+    # if stat.st_size >= 100_000_000:
+    #     crc = compute_crc32(path)
 
     manifest.append(f"{crc} {stat.st_size} /internal/{nginx_path.as_posix()} {zip_path}")
 
@@ -214,31 +212,8 @@ def download_files(paths: list[Path]) -> Response:
     response.headers["Content-Disposition"] = 'attachment; filename="archive.zip"'
     return response
 
-    if len(paths) == 1:
-        if paths[0].is_file():
-            return File(path=paths[0], filename=paths[0].name)
 
-    z = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
-
-    for path in paths:
-        parent = path.parent
-        if path.is_file():
-            z.write(path, arcname=path.relative_to(parent))
-        elif path.is_dir():
-            for file in path.rglob("*"):
-                if file.is_file():
-                    z.write(file, arcname=file.relative_to(parent))
-
-    return Stream(
-        z,
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": 'attachment; filename="miniverse_files.zip"'
-        },
-    )
-
-
-async def upload_miniverse_files(miniverse: Miniverse, files: list[UploadFile], destination: Path):
+async def upload_miniverse_files(miniverse: Miniverse, files: NginxUploadData, destination: Path):
     base_path = get_miniverse_path(miniverse.id) / "data"
     dest_path = safe_user_path(base_path, destination)
 
@@ -247,23 +222,14 @@ async def upload_miniverse_files(miniverse: Miniverse, files: list[UploadFile], 
 
     dest_path.mkdir(parents=True, exist_ok=True)
 
-    for upload in files:
-        relative_path = Path(upload.filename)
+    uploads = zip(files.name, files.path)
+    for upload in uploads:
+        relative_path = Path(upload[0])
         target = safe_user_path(dest_path, relative_path)
         target.parent.mkdir(parents=True, exist_ok=True)
-
         target = change_path_name_if_exists(target)
 
-        await upload.seek(0)
-
-        with target.open("wb") as out:
-            while True:
-                chunk = await upload.read(1024 * 1024)
-                if not chunk:
-                    break
-                out.write(chunk)
-
-        await upload.close()
+        upload[1].rename(target)
 
 
 async def extract_miniverse_archive(miniverse: Miniverse, path: Path):

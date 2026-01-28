@@ -78,6 +78,9 @@ services:
       - "443:443"
     networks:
       backend-net:
+      # default: # Add this if "host-gateway" is not defined on linux
+    extra_hosts:
+      - "miniverse-api:host-gateway" # redirect nginx trafic to host litestar
     depends_on:
       - miniverse-api
       - keycloak

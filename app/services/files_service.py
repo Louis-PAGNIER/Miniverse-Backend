@@ -180,7 +180,10 @@ def add_to_manifest(manifest: list[Any], parent: Path, path: Path):
     nginx_path = path.relative_to(settings.DATA_PATH)
     zip_path = path.relative_to(parent)
 
-    crc = compute_crc32(path)
+    crc = "-"
+    if stat.st_size >= 100_000_000:
+        crc = compute_crc32(path)
+    print(stat.st_size)
 
     manifest.append(f"{crc} {stat.st_size} /internal/{nginx_path.as_posix()} {zip_path}")
 
@@ -188,7 +191,12 @@ def add_to_manifest(manifest: list[Any], parent: Path, path: Path):
 def download_files(paths: list[Path]) -> Response:
     if len(paths) == 1:
         if paths[0].is_file():
-            return File(path=paths[0], filename=paths[0].name)
+            internal_path = f"/internal/{paths[0].relative_to(settings.DATA_PATH).as_posix()}"
+            response = Response(content="")
+            response.headers["X-Accel-Redirect"] = internal_path
+            response.headers["Content-Type"] = "application/octet-stream"
+            response.headers["Content-Disposition"] = f'attachment; filename="{paths[0].name}"'
+            return response
 
     manifest = []
     for path in paths:
@@ -202,8 +210,8 @@ def download_files(paths: list[Path]) -> Response:
 
     response = Response(content="\n".join(manifest) + "\n")
     response.headers["X-Archive-Files"] = "zip"  # Trigger mod_zip
-    response.headers["Content-Disposition"] = 'attachment; filename="bundle.zip"'  # TODO change this filename
     response.headers["Content-Type"] = "application/zip"
+    response.headers["Content-Disposition"] = 'attachment; filename="archive.zip"'
     return response
 
     if len(paths) == 1:

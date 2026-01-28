@@ -83,9 +83,9 @@ class FilesController(Controller):
             self,
             current_user: User,
             miniverse_id: str,
+            destination: Path,
             db: AsyncSession,
             data: NginxUploadData = Body(media_type=RequestEncodingType.MULTI_PART),
-            destination: Path = Path("/"),
     ) -> None:
         if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
             raise NotAuthorizedException("You are not authorized to upload files in this miniverse")

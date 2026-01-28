@@ -5,6 +5,7 @@ from copy import copy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import zipstream
 from litestar import Response
@@ -183,7 +184,7 @@ def add_to_manifest(manifest: list[Any], parent: Path, path: Path):
     # if stat.st_size >= 100_000_000:
     #     crc = compute_crc32(path)
 
-    manifest.append(f"{crc} {stat.st_size} /internal/{nginx_path.as_posix()} {zip_path}")
+    manifest.append(f"{crc} {stat.st_size} /internal/{quote(nginx_path.as_posix(), safe='/')} {zip_path}")
 
 
 def download_files(paths: list[Path]) -> Response:
@@ -224,12 +225,15 @@ async def upload_miniverse_files(miniverse: Miniverse, files: NginxUploadData, d
 
     uploads = zip(files.name, files.path)
     for upload in uploads:
-        relative_path = Path(upload[0])
+        filename = upload[0]
+        tmp_path = upload[1]
+        relative_path = Path(filename)
         target = safe_user_path(dest_path, relative_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target = change_path_name_if_exists(target)
 
-        upload[1].rename(target)
+        tmp_path = settings.DATA_PATH.parent / Path("./" + str(tmp_path))
+        tmp_path.rename(target)
 
 
 async def extract_miniverse_archive(miniverse: Miniverse, path: Path):

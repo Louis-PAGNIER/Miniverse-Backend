@@ -130,6 +130,7 @@ class FilesController(Controller):
             filename = meta["filename"]
             destination = Path(meta["destination"])
             await upload_miniverse_file(miniverse, file_id, filename, destination)
+        return None
 
     @post("/{miniverse_id:str}/extract")
     async def extract_miniverse_archive(

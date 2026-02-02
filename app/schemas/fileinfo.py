@@ -26,7 +26,6 @@ class RenameFileRequest:
     new_name: str
 
 
-@dataclass
 class HookType(Enum):
     pre_create = "pre-create"
     post_finish = "post-finish"

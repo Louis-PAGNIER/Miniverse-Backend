@@ -62,7 +62,7 @@ COPY conf/nginx.conf /etc/nginx/nginx.conf
 COPY conf/conf.d/ /etc/nginx/conf.d/
 
 COPY entrypoint.sh /docker-entrypoint.d/99-generate-cert.sh
-RUN chmod +x /docker-entrypoint.d/99-generate-cert.sh
+RUN dos2unix /docker-entrypoint.d/99-generate-cert.sh && chmod +x /docker-entrypoint.d/99-generate-cert.sh
 
 COPY --from=frontend-builder /html/dist/ /usr/share/nginx/html/
 

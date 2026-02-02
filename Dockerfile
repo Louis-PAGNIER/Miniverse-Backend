@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     sqlite3 \
     cron \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer Poetry
@@ -24,7 +25,7 @@ RUN poetry config virtualenvs.create false \
 
 # Copie le scirpt de configuration de crond
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Copier ton code
 COPY app ./app

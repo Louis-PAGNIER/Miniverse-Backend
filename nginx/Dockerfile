@@ -19,7 +19,6 @@ RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz && \
 
 # Clone the mod_zip repository
 RUN git clone https://github.com/evanmiller/mod_zip.git
-RUN git clone https://github.com/fdintino/nginx-upload-module.git
 RUN git clone https://github.com/tokers/zstd-nginx-module
 
 
@@ -27,7 +26,6 @@ RUN git clone https://github.com/tokers/zstd-nginx-module
 WORKDIR /nginx-${NGINX_VERSION}
 RUN ./configure --with-compat \
     --add-dynamic-module=/mod_zip \
-    --add-dynamic-module=/nginx-upload-module \
     --add-dynamic-module=/zstd-nginx-module \
     && make modules
 
@@ -57,7 +55,6 @@ RUN apk add --no-cache  \
 
 
 COPY --from=nginx-builder /nginx-*/objs/ngx_http_zip_module.so /usr/lib/nginx/modules/
-COPY --from=nginx-builder /nginx-*/objs/ngx_http_upload_module.so /usr/lib/nginx/modules/
 COPY --from=nginx-builder /nginx-*/objs/ngx_http_zstd_filter_module.so /usr/lib/nginx/modules/
 COPY --from=nginx-builder /nginx-*/objs/ngx_http_zstd_static_module.so /usr/lib/nginx/modules/
 

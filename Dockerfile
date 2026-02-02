@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     sqlite3 \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer Poetry
@@ -21,6 +22,10 @@ COPY pyproject.toml poetry.lock poetry.toml* ./
 RUN poetry config virtualenvs.create false \
     && poetry install --no-root --no-interaction --no-ansi
 
+# Copie le scirpt de configuration de crond
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Copier ton code
 COPY app ./app
 
@@ -29,6 +34,8 @@ RUN mkdir -p /app/data
 
 # Exposer ton port (ex : Litestar sur 8000)
 EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Lancer ton serveur (adapté si tu utilises Litestar avec uvicorn)
 CMD ["litestar", "--app", "app.main:app", "run", "--debug", "--host", "0.0.0.0", "--port", "8000"]

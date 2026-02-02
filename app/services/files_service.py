@@ -13,7 +13,7 @@ from litestar.concurrency import sync_to_thread
 
 from app.core import root_store, settings
 from app.models import Miniverse
-from app.schemas.fileinfo import FileInfo, NginxUploadData
+from app.schemas.fileinfo import FileInfo
 from app.services.miniverse_service import get_miniverse_path
 
 download_tokens_store = root_store.with_namespace("download-tokens")
@@ -214,7 +214,7 @@ def download_files(paths: list[Path]) -> Response:
     return response
 
 
-async def upload_miniverse_files(miniverse: Miniverse, files: NginxUploadData, destination: Path):
+async def upload_miniverse_file(miniverse: Miniverse, file_id: str, filename: str, destination: Path):
     base_path = get_miniverse_path(miniverse.id) / "data"
     dest_path = safe_user_path(base_path, destination)
 
@@ -223,17 +223,14 @@ async def upload_miniverse_files(miniverse: Miniverse, files: NginxUploadData, d
 
     dest_path.mkdir(parents=True, exist_ok=True)
 
-    uploads = zip(files.name, files.path)
-    for upload in uploads:
-        filename = upload[0]
-        tmp_path = upload[1]
-        relative_path = Path(filename)
-        target = safe_user_path(dest_path, relative_path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target = change_path_name_if_exists(target)
+    relative_path = Path(filename)
+    target = safe_user_path(dest_path, relative_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target = change_path_name_if_exists(target)
 
-        tmp_path = settings.DATA_PATH.parent / Path("./" + str(tmp_path))
-        tmp_path.rename(target)
+    tmp_path = settings.DATA_PATH / "uploads" / file_id
+    tmp_path.with_suffix(".info").unlink()
+    tmp_path.rename(target)
 
 
 async def extract_miniverse_archive(miniverse: Miniverse, path: Path):

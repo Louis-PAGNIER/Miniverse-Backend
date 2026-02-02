@@ -73,7 +73,6 @@ services:
     volumes:
       - ${HOST_DATA_PATH}/certs/:/etc/nginx/ssl/
       - ${HOST_DATA_PATH}/miniverses/:/data/miniverses/
-      - ${HOST_DATA_PATH}/uploads/:/data/uploads/
     ports:
       - "80:80"
       - "443:443"
@@ -85,11 +84,32 @@ services:
     depends_on:
       - miniverse-api
       - keycloak
+      - tusd
     develop:
       watch:
         - action: sync+restart
           path: nginx/conf/
           target: /etc/nginx/
+    restart: unless-stopped
+
+  tusd:
+    container_name: tusd
+    image: tusproject/tusd:latest
+    command:
+      - "-base-path=/api/files/tus"
+      - "-behind-proxy"
+      - "-disable-download"
+      - "-upload-dir=./data"
+      - "-hooks-http=http://miniverse-api:8000/api/files/tus-hooks"
+      - "-hooks-enabled-events=pre-create,post-finish"
+      - "-hooks-http-forward-headers=Cookie,X-CSRFToken"
+      - "-verbose"
+    volumes:
+      - ${HOST_DATA_PATH}/uploads/:/srv/tusd-data/data
+    networks:
+      backend-net:
+    extra_hosts:
+      - "miniverse-api:host-gateway"
     restart: unless-stopped
 
 networks:

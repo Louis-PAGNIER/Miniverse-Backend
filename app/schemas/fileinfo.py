@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +27,12 @@ class RenameFileRequest:
 
 
 @dataclass
-class NginxUploadData:
-    path: list[Path]
-    name: list[str]
+class HookType(Enum):
+    pre_create = "pre-create"
+    post_finish = "post-finish"
+
+
+@dataclass
+class HookRequest:
+    Type: HookType
+    Event: dict

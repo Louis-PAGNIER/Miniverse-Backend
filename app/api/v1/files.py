@@ -1,19 +1,18 @@
 from pathlib import Path
 
-from litestar import Controller, get, post, Response
+from litestar import Controller, get, post, Response, MediaType
 from litestar.di import Provide
-from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotAuthorizedException, NotFoundException
-from litestar.params import Body
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import get_db_session
+from app.core import settings
 from app.enums import Role
 from app.models import User
-from app.schemas.fileinfo import FileInfo, FilesRequest, RenameFileRequest, NginxUploadData
+from app.schemas.fileinfo import FileInfo, FilesRequest, RenameFileRequest, HookRequest, HookType
 from app.services.auth_service import get_current_user
 from app.services.files_service import list_miniverse_files, delete_miniverse_files, copy_miniverse_files, \
-    transform_safe_miniverse_files, download_files, upload_miniverse_files, extract_miniverse_archive, rename_file, \
+    transform_safe_miniverse_files, download_files, upload_miniverse_file, extract_miniverse_archive, rename_file, \
     compress_miniverse_files
 from app.services.miniverse_service import get_miniverse
 
@@ -78,21 +77,59 @@ class FilesController(Controller):
 
         return download_files(safe_paths)
 
-    @post("/upload")
+    @post("/tus-hooks")
     async def confirm_upload(
             self,
             current_user: User,
-            miniverse_id: str,
-            destination: Path,
-            db: AsyncSession,
-            data: NginxUploadData = Body(media_type=RequestEncodingType.MULTI_PART),
-    ) -> None:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
-            raise NotAuthorizedException("You are not authorized to upload files in this miniverse")
+            data: HookRequest,
+            db: AsyncSession
+    ) -> Response | None:
+        # 1. AUTHENTICATION (pre-create)
+        if data.Type == HookType.pre_create:
+            # Tus forwards headers from the client.
+            # The client must send 'Upload-Metadata: token=xyz' or standard headers.
+            meta = data.Event["Upload"]["MetaData"]
+            miniverse_id = meta["miniverseId"]
+            if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+                return Response(content={
+                    'HTTPResponse': {
+                        'StatusCode': 401,
+                        'Headers': {},
+                        'Body': "You are not authorized to upload files in this miniverse"
+                    },
+                    'RejectUpload': True,
+                }, media_type=MediaType.JSON)
 
-        miniverse = await get_miniverse(miniverse_id, db)
+            print(f"User authorized. Starting upload for {meta["filename"]}")
+            return Response(content={
+                'HTTPResponse': {
+                    'StatusCode': 204,
+                },
+                'RejectUpload': False,
+            }, media_type=MediaType.JSON)
 
-        return await upload_miniverse_files(miniverse, data, destination)
+        # 2. COMPLETION (post-finish)
+        if data.Type == HookType.post_finish:
+            file_id = data.Event["Upload"]["ID"]
+            # The file is now fully on disk at ./data/{file_id}
+            print(f"Upload complete! File ID: {file_id}")
+
+            # Trigger your processing logic here (e.g. database update)
+            meta = data.Event["Upload"]["MetaData"]
+            miniverse_id = meta['miniverseId']
+
+            # Check user permission a second time before adding file
+            if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+                # Remove uploaded file and related .info
+                (settings.DATA_PATH / "uploads" / file_id).unlink()
+                (settings.DATA_PATH / "uploads" / (file_id + '.info')).unlink()
+                return None
+
+            miniverse = await get_miniverse(miniverse_id, db)
+
+            filename = meta["filename"]
+            destination = Path(meta["destination"])
+            await upload_miniverse_file(miniverse, file_id, filename, destination)
 
     @post("/{miniverse_id:str}/extract")
     async def extract_miniverse_archive(

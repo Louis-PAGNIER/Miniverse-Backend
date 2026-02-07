@@ -17,7 +17,8 @@ class UsersController(Controller):
     }
 
     @get("/")
-    async def list_users(self, db: AsyncSession) -> list[User]:
+    async def list_users(self, db: AsyncSession) -> list[User]:  # TODO : restrict this api to admin only
+
         return await get_users(db)
 
     @get("/{user_id:str}")

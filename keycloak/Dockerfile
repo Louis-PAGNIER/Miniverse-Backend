@@ -9,6 +9,7 @@ ENV KC_DB=mysql
 
 # Condigure proxy mode
 ENV KC_HTTP_ENABLED=true
+# TODO: change this to true
 ENV KC_HOSTNAME_STRICT=false
 ENV KC_PROXY_HEADERS=xforwarded
 ENV KC_HTTP_RELATIVE_PATH=/keycloak
@@ -25,6 +26,7 @@ ENV KC_DB_URL=jdbc:mysql://mysql/keycloak_db
 ENV KC_DB_USERNAME=keycloak_db_user
 
 ENV KC_HTTP_ENABLED=true
+# TODO: change this to true
 ENV KC_HOSTNAME_STRICT=false
 ENV KC_PROXY_HEADERS=xforwarded
 ENV KC_HTTP_RELATIVE_PATH=/keycloak

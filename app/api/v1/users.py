@@ -1,11 +1,14 @@
-from litestar import get, Controller
+from litestar import get, Controller, delete, put
 from litestar.di import Provide
+from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
+from app.enums import Role
 from app.models import User
-from app.services.auth_service import get_current_user
-from app.services.user_service import get_users, get_user
+from app.schemas.user import RoleSchema
+from app.services.auth_service import get_current_user, admin_user_guard
+from app.services.user_service import get_users, get_user, delete_user, set_user_role, count_admins, get_inactive_users
 
 
 class UsersController(Controller):
@@ -15,16 +18,39 @@ class UsersController(Controller):
         "db": Provide(get_db_session),
         "current_user": Provide(get_current_user),
     }
+    guards = [admin_user_guard]
+
+    # TODO: Ignore guards
+    @get("/me", guards=[])
+    async def get_me(self, current_user: User) -> User:
+        return current_user
+
+    @delete("/me", guards=[])
+    async def delete_me(self, current_user: User, db: AsyncSession) -> None:
+        if current_user.role == Role.ADMIN and await count_admins(db) <= 1:
+            raise PermissionDeniedException("You are the only remaining admin")
+        await delete_user(current_user.id, db)
 
     @get("/")
-    async def list_users(self, db: AsyncSession) -> list[User]:  # TODO : restrict this api to admin only
-
+    async def list_users(self, db: AsyncSession) -> list[User]:
         return await get_users(db)
+
+    @get("/inactive")
+    async def list_inactive_users(self, db: AsyncSession) -> list[User]:
+        return await get_inactive_users(db)
 
     @get("/{user_id:str}")
     async def get_user(self, user_id: str, db: AsyncSession) -> User | None:
         return await get_user(user_id, db)
 
-    @get("/me")
-    async def get_me(self, current_user: User) -> User:
-        return current_user
+    @delete("/{user_id:str}")
+    async def delete_user(self, user_id: str, current_user: User, db: AsyncSession) -> None:
+        if current_user.id == user_id:
+            raise PermissionDeniedException("You cannot delete yourself")
+        await delete_user(user_id, db)
+
+    @put("/{user_id:str}/role")
+    async def set_user_role(self, user_id: str, current_user: User, data: RoleSchema, db: AsyncSession) -> None:
+        if current_user.id == user_id and await count_admins(db) <= 1:
+            raise PermissionDeniedException("You are the only remaining admin")
+        await set_user_role(user_id, data.role, db)

@@ -11,6 +11,7 @@ services:
       SQLALCHEMY_DATABASE_PASSWORD: ${MINIVERSE_DB_PASS}
       PROXY_SECRET: ${PROXY_SECRET}
       HOST_DATA_PATH: ${HOST_DATA_PATH}
+      DOMAIN_NAME: ${DOMAIN_NAME}
     networks:
       - miniverse-net
       - backend-net

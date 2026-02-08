@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     KEYCLOAK_ISSUER: str = "http://keycloak:8080/keycloak/"
     KEYCLOAK_REALM: str = "miniverse"
     KEYCLOAK_CLIENT_ID: str = "miniverse-client"
+    DOMAIN_NAME: str = "miniverse.fr"
 
 
 settings = Settings()

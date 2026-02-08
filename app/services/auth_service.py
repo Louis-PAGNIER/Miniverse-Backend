@@ -5,7 +5,7 @@ from keycloak import KeycloakOpenID
 from keycloak import exceptions
 from litestar import Request
 from litestar.connection import ASGIConnection
-from litestar.exceptions import NotAuthorizedException
+from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
 from litestar.handlers import BaseRouteHandler
 from litestar.security.jwt import Token, JWTCookieAuth
 
@@ -48,13 +48,13 @@ async def retrieve_user_handler(token: Token, _: ASGIConnection[Any, Any, Any, A
             user = await create_user(token.sub, token.extras["preferred_username"], session)
 
         if not user.is_active:
-            return None
+            raise PermissionDeniedException("Inactive user")
 
         if user.username != token.extras["preferred_username"]:
             user.username = token.extras["preferred_username"]
             await session.commit()
 
-        return user  # TODO Return special error so front display some "need activation" or "token expired"
+        return user
     return None
 
 

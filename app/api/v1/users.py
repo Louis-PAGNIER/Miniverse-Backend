@@ -1,6 +1,6 @@
 from litestar import get, Controller, delete, put, post
 from litestar.di import Provide
-from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
+from litestar.exceptions import PermissionDeniedException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
@@ -20,11 +20,11 @@ class SelfUserController(Controller):
         "current_user": Provide(get_current_user),
     }
 
-    @get("/me", guards=[])
+    @get("/me")
     async def get_me(self, current_user: User) -> User:
         return current_user
 
-    @delete("/me", guards=[])
+    @delete("/me")
     async def delete_me(self, current_user: User, db: AsyncSession) -> None:
         if current_user.role == Role.ADMIN and await count_admins(db) <= 1:
             raise PermissionDeniedException("You are the only remaining admin")

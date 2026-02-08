@@ -19,6 +19,10 @@ async def create_user(userid: str, username: str, db: AsyncSession) -> User:
     return db_user
 
 
+async def get_user(user_id: str, db: AsyncSession) -> User | None:
+    return await db.get(User, user_id)
+
+
 async def get_users(db: AsyncSession) -> list[User]:
     result = await db.execute(select(User).where(User.is_active == True))
     return list(result.scalars().all())
@@ -27,10 +31,6 @@ async def get_users(db: AsyncSession) -> list[User]:
 async def count_admins(db: AsyncSession) -> int:
     result = await db.execute(select(func.count(User.id)).where(User.role == Role.ADMIN))
     return result.scalar()
-
-
-async def get_user(user_id: str, db: AsyncSession) -> User | None:
-    return await db.get(User, user_id)
 
 
 async def get_user_by_username(username: str, db: AsyncSession) -> User | None:

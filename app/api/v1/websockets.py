@@ -30,16 +30,15 @@ async def handle_miniverse_channel_message(message: bytes,
                                            ctx: WebsocketContext) -> None:
     event = MiniverseEvent.from_bytes(message)
 
+    before_user_role = ctx.user.get_miniverse_role(event.miniverse_id)
+    max_user_role = before_user_role
     if event.updated_user_ids is not None and ctx.user.id in event.updated_user_ids:
         await db.rollback()
         await db.refresh(ctx.user)
+        after_user_role = ctx.user.get_miniverse_role(event.miniverse_id)
+        max_user_role = max(before_user_role, after_user_role)
 
-        # Hacky way of sending deleted event only to correct users
-        if event.type == EventType.DELETED:
-            await socket.send_json(event)
-            return
-
-    if event.miniverse_id is None or ctx.user.get_miniverse_role(event.miniverse_id) >= Role.USER:
+    if event.miniverse_id is None or max_user_role >= Role.USER:
         await socket.send_json(event)
 
 

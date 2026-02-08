@@ -1,22 +1,28 @@
 import json
+import re
 
-from litestar import get, post, Controller, delete
+from litestar import get, post, Controller, delete, put
 from litestar.di import Provide
 from litestar.exceptions import NotFoundException, NotAuthorizedException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.enums import Role
+from app.events.miniverse_event import publish_miniverse_updated_event
 from app.managers.ServerStatusManager import server_status_store
-from app.models import Miniverse, Mod, User
+from app.models import Miniverse, Mod, User, MiniverseUserRole
 from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod, \
     MSMPPlayerBan
+from app.schemas.user import RoleSchema
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
     start_miniverse, stop_miniverse, restart_miniverse, update_miniverse, miniverse_set_player_operator, \
-    miniverse_kick_player, miniverse_ban_player, miniverse_unban_player
+    miniverse_kick_player, miniverse_ban_player, miniverse_unban_player, list_miniverse_users, get_miniverse_user_role
 from app.services.mods_service import get_mod, install_mod, uninstall_mod, update_mod, list_possible_mod_updates, \
     automatic_mod_install
+from app.services.user_service import get_user, get_user_by_username
+
+UUID4_REGEX = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', re.IGNORECASE)
 
 
 class MiniversesController(Controller):
@@ -146,6 +152,52 @@ class MiniversesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
 
         return await list_possible_mod_updates(miniverse)
+
+    @get("/{miniverse_id:str}/users")
+    async def list_miniverse_users(self, current_user: User, miniverse_id: str, db: AsyncSession) -> list[User]:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to list users of this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        # We hide the global role from response
+        users = await list_miniverse_users(miniverse)
+        for user in users:
+            user.role = Role.NONE
+        return users
+
+    @put("/{miniverse_id:str}/roles/{user_id_or_name:str}")
+    async def set_user_role(self, current_user: User, miniverse_id: str, user_id_or_name: str, data: RoleSchema, db: AsyncSession) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to list users of this miniverse")
+
+        is_uuid = bool(UUID4_REGEX.match(user_id_or_name))
+        if is_uuid:
+            user = await get_user(user_id_or_name, db)
+        else:
+            user = await get_user_by_username(user_id_or_name, db)
+
+        if user is None:
+            raise NotFoundException("User not found")
+
+        mur = await get_miniverse_user_role(miniverse_id, user.id, db)
+        if mur is None:
+            if data.role != Role.NONE:
+                mur = MiniverseUserRole(
+                    user_id=user.id,
+                    miniverse_id=miniverse_id,
+                    role=data.role,
+                )
+                db.add(mur)
+        else:
+            if data.role == Role.NONE:
+                await db.delete(mur)
+            else:
+                mur.role = data.role
+
+        await db.commit()
+        publish_miniverse_updated_event(miniverse_id, [user.id])
+
 
     @get("/players")
     async def list_all_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:

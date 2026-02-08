@@ -215,6 +215,15 @@ async def restart_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
     return await start_miniverse(miniverse, db)
 
 
+async def get_miniverse_user_role(miniverse_id: str, user_id: str, db: AsyncSession) -> MiniverseUserRole:
+    res = await db.execute(select(MiniverseUserRole).where(MiniverseUserRole.user_id == user_id, MiniverseUserRole.miniverse_id == miniverse_id))
+    return res.scalars().first()
+
+
+async def list_miniverse_users(miniverse: Miniverse) -> list[User]:
+    return [user_role.user for user_role in miniverse.users_roles]
+
+
 async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncSession,
                            force_update: bool = False) -> Miniverse:
     if miniverse.mc_version == new_mc_version:

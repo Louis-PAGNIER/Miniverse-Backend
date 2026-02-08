@@ -1,4 +1,4 @@
-from litestar import get, Controller, delete, put
+from litestar import get, Controller, delete, put, post
 from litestar.di import Provide
 from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,19 +8,18 @@ from app.enums import Role
 from app.models import User
 from app.schemas.user import RoleSchema
 from app.services.auth_service import get_current_user, admin_user_guard
-from app.services.user_service import get_users, get_user, delete_user, set_user_role, count_admins, get_inactive_users
+from app.services.user_service import get_users, get_user, delete_user, set_user_role, count_admins, get_inactive_users, \
+    accept_user_request, reject_user_request
 
 
-class UsersController(Controller):
+class SelfUserController(Controller):
     path = "/api/users"
     tags = ["Users"]
     dependencies = {
         "db": Provide(get_db_session),
         "current_user": Provide(get_current_user),
     }
-    guards = [admin_user_guard]
 
-    # TODO: Ignore guards
     @get("/me", guards=[])
     async def get_me(self, current_user: User) -> User:
         return current_user
@@ -31,13 +30,18 @@ class UsersController(Controller):
             raise PermissionDeniedException("You are the only remaining admin")
         await delete_user(current_user.id, db)
 
+class UsersController(Controller):
+    path = "/api/users"
+    tags = ["Users"]
+    dependencies = {
+        "db": Provide(get_db_session),
+        "current_user": Provide(get_current_user),
+    }
+    guards = [admin_user_guard]
+
     @get("/")
     async def list_users(self, db: AsyncSession) -> list[User]:
         return await get_users(db)
-
-    @get("/inactive")
-    async def list_inactive_users(self, db: AsyncSession) -> list[User]:
-        return await get_inactive_users(db)
 
     @get("/{user_id:str}")
     async def get_user(self, user_id: str, db: AsyncSession) -> User | None:
@@ -54,3 +58,15 @@ class UsersController(Controller):
         if current_user.id == user_id and await count_admins(db) <= 1:
             raise PermissionDeniedException("You are the only remaining admin")
         await set_user_role(user_id, data.role, db)
+
+    @get("/inactive")
+    async def list_inactive_users(self, db: AsyncSession) -> list[User]:
+        return await get_inactive_users(db)
+
+    @post("/inactive/accept/{user_id:str}")
+    async def accept_user_request(self, user_id: str, db: AsyncSession) -> None:
+        await accept_user_request(user_id, db)
+
+    @post("/inactive/reject/{user_id:str}")
+    async def reject_user_request(self, user_id: str, db: AsyncSession) -> None:
+        await reject_user_request(user_id, db)

@@ -20,12 +20,7 @@ async def create_user(userid: str, username: str, db: AsyncSession) -> User:
 
 
 async def get_users(db: AsyncSession) -> list[User]:
-    result = await db.execute(select(User))
-    return list(result.scalars().all())
-
-
-async def get_inactive_users(db: AsyncSession) -> list[User]:
-    result = await db.execute(select(User).where(User.is_active == False))
+    result = await db.execute(select(User).where(User.is_active == True))
     return list(result.scalars().all())
 
 
@@ -54,3 +49,18 @@ async def set_user_role(user_id: str, role: Role, db: AsyncSession) -> None:
     user = await get_user(user_id, db)
     user.role = role
     await db.commit()
+
+
+async def get_inactive_users(db: AsyncSession) -> list[User]:
+    result = await db.execute(select(User).where(User.is_active == False))
+    return list(result.scalars().all())
+
+
+async def accept_user_request(user_id: str, db: AsyncSession) -> None:
+    user = await get_user(user_id, db)
+    user.is_active = True
+    await db.commit()
+
+
+async def reject_user_request(user_id: str, db: AsyncSession) -> None:
+    await delete_user(user_id, db)

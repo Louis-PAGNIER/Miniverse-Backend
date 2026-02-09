@@ -39,9 +39,11 @@ class User(Base):
 class MiniverseUserRole(Base):
     __tablename__ = "miniverse_user_roles"
 
-    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), info=dto_field("read-only"),
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"),
+                                         info=dto_field("read-only"),
                                          primary_key=True)
-    miniverse_id: Mapped[str] = mapped_column(String(36), ForeignKey("miniverses.id"), info=dto_field("read-only"),
+    miniverse_id: Mapped[str] = mapped_column(String(36), ForeignKey("miniverses.id", ondelete="CASCADE"),
+                                              info=dto_field("read-only"),
                                               primary_key=True)
     role: Mapped[Role] = mapped_column(Enum(Role))
 

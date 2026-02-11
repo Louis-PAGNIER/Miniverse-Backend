@@ -89,6 +89,7 @@ jobs:
           ' docker-compose.yml > docker-compose.prod.yml
           
           cat docker-compose.prod.yml
+          mv docker-compose.prod.yml docker-compose.yml
 
       - name: Copy docker-compose.yml to server
         uses: appleboy/scp-action@master
@@ -98,9 +99,9 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           # Source is the NEW file we just generated
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.yml"
           # Target renames it back to docker-compose.yml on the server
-          target: "/home/${{ secrets.SSH_USER }}/app/docker-compose.yml"
+          target: "/home/${{ secrets.SSH_USER }}/app/"
 
       - name: Deploy to Server
         uses: appleboy/ssh-action@master

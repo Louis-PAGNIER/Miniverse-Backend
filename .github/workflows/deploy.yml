@@ -74,7 +74,7 @@ jobs:
       - name: Generate Production Compose File
         run: |
           # 1. Define and export the prefix as an environment variable
-          export REGISTRY_PREFIX="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
+          export REGISTRY_PREFIX="ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')"
           
           # 2. Use yq to transform the file
           # We select services that have a 'build' key, 

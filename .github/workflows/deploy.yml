@@ -73,27 +73,21 @@ jobs:
 
       - name: Generate Production Compose File
         run: |
-          # Define your registry prefix
-          # Note: We use 'tr' to ensure lowercase (Docker requirement)
-          REGISTRY_PREFIX="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
+          # 1. Define and export the prefix as an environment variable
+          export REGISTRY_PREFIX="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
           
-          # Run yq to transform the file
-          # 1. with_entries iterates over services (key=service name, value=service config)
-          # 2. Check if .value.build exists
-          # 3. If yes: Set .value.image based on the service name (.key) and delete .value.build
-          
-          yq eval '
-            .services |= with_entries(
-              if .value.build then
-                .value.image = "'"$REGISTRY_PREFIX"'/" + .key + ":latest" |
-                del(.value.build)
-              else
-                .
-              end
+          # 2. Use yq to transform the file
+          # We select services that have a 'build' key, 
+          # set their 'image' using the service name (key),
+          # and then delete the 'build' block.
+          yq '
+            .services[] |= (
+              select(has("build")) | 
+              .image = env(REGISTRY_PREFIX) + "/" + key + ":latest" | 
+              del(.build)
             )
           ' docker-compose.yml > docker-compose.prod.yml
           
-          # Optional: Print file to logs to verify
           cat docker-compose.prod.yml
 
       - name: Copy docker-compose.yml to server

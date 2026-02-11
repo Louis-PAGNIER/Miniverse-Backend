@@ -53,7 +53,7 @@ services:
       --optimized
       --import-realm
     environment:
-      #      KC_HOSTNAME: ${DOMAIN_NAME}
+      KC_HOSTNAME: ${KC_HOSTNAME}
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASS}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}

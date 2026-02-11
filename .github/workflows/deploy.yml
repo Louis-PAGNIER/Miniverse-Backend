@@ -1,0 +1,104 @@
+name: deploy.yml
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    # DEFINING THE MATRIX
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: miniverse-api
+            context: ./
+            dockerfile: ./Dockerfile
+            image_name: miniverse-api
+          - service: mysql
+            context: ./mysql
+            dockerfile: ./mysql/Dockerfile
+            image_name: mysql
+          - service: keycloak
+            context: ./keycloak
+            dockerfile: ./keycloak/Dockerfile
+            image_name: keycloak
+          - service: nginx
+            context: ./nginx
+            dockerfile: ./nginx/Dockerfile
+            image_name: nginx
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+      #          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # Dynamic image name based on the matrix
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image_name }}
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+deploy:
+  needs: build-and-push
+  runs-on: ubuntu-latest
+
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Copy docker-compose.yml to server
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "docker-compose.yml"
+        target: "/home/${{ secrets.SSH_USER }}/app/"
+
+    - name: Deploy to Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Navigate to the app directory
+          cd /home/${{ secrets.SSH_USER }}/app/
+          
+          # Login to GitHub Container Registry on the server
+          # Note: You might need to generate a PAT (Personal Access Token) for this if GITHUB_TOKEN doesn't persist
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          # Pull the latest image
+          docker compose pull
+          
+          # Restart containers
+          docker compose up -d --remove-orphans
+          
+          # Cleanup unused images to save space
+          docker image prune -f

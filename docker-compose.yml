@@ -3,7 +3,7 @@ services:
     build: .
     image: ghcr.io/louis-pagnier/miniverse-api:latest
     container_name: miniverse-api
-    user: "1000:0"
+    user: "1000:${DOCKER_GID:-999}"
     volumes:
       - ${HOST_DATA_PATH}:/app/data
       - /var/run/docker.sock:/var/run/docker.sock:ro

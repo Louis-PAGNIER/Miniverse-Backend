@@ -78,7 +78,7 @@ services:
       - ${HOST_DATA_PATH}/certs/:/etc/nginx/ssl/
       - ${HOST_DATA_PATH}/miniverses/:/data/miniverses/
     ports:
-      - "8443:443"
+      - "${NGINX_HOST_PORT:-443}:443"
     networks:
       backend-net:
       # default: # Add this if "host-gateway" is not defined on linux

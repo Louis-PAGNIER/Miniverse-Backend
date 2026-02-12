@@ -31,6 +31,7 @@ services:
   mysql:
     container_name: mysql
     build: mysql/
+    image: ghcr.io/louis-pagnier/mysql:latest
     ports:
       - "127.0.0.1:3306:3306" # Removed in prod
     environment:
@@ -46,6 +47,7 @@ services:
   keycloak:
     container_name: keycloak
     build: keycloak/
+    image: ghcr.io/louis-pagnier/keycloak:latest
     ports:
       - "127.0.0.1:8080:8080" # Removed in prod
     command:
@@ -69,6 +71,7 @@ services:
       context: nginx/
       args:
         - BRANCH=${GIT_BRANCH:-main}
+    image: ghcr.io/louis-pagnier/nginx:latest
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
     volumes:

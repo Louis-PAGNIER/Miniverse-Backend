@@ -71,26 +71,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate Production Compose File
-        run: |
-          # 1. Define and export the prefix as an environment variable
-          export REGISTRY_PREFIX="ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')"
-          
-          # 2. Use yq to transform the file
-          # We select services that have a 'build' key, 
-          # set their 'image' using the service name (key),
-          # and then delete the 'build' block.
-          yq '
-            .services[] |= (
-              select(has("build")) | 
-              .image = env(REGISTRY_PREFIX) + "/" + key + ":latest" | 
-              del(.build)
-            )
-          ' docker-compose.yml > docker-compose.prod.yml
-          
-          cat docker-compose.prod.yml
-          mv docker-compose.prod.yml docker-compose.yml
-
       - name: Copy docker-compose.yml to server
         uses: appleboy/scp-action@master
         with:
@@ -98,9 +78,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # Source is the NEW file we just generated
           source: "docker-compose.yml"
-          # Target renames it back to docker-compose.yml on the server
           target: "/home/${{ secrets.SSH_USER }}/app/"
 
       - name: Deploy to Server
@@ -122,7 +100,7 @@ jobs:
             docker compose pull
             
             # Restart containers
-            docker compose up -d --remove-orphans
+            docker compose up -d --no-build --remove-orphans
             
             # Cleanup unused images to save space
             docker image prune -f

@@ -1,6 +1,7 @@
 services:
   miniverse-api:
     build: .
+    image: ghcr.io/louis-pagnier/miniverse-api:latest
     container_name: miniverse-api
     volumes:
       - ${HOST_DATA_PATH}:/app/data
@@ -42,6 +43,7 @@ services:
   mysql:
     container_name: mysql
     build: mysql/
+    image: ghcr.io/louis-pagnier/mysql:latest
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MINIVERSE_DB_PASS: ${MINIVERSE_DB_PASS}
@@ -55,6 +57,7 @@ services:
   keycloak:
     container_name: keycloak
     build: keycloak/
+    image: ghcr.io/louis-pagnier/keycloak:latest
     command:
       start
       --optimized
@@ -76,6 +79,7 @@ services:
       context: nginx/
       args:
         - BRANCH=${GIT_BRANCH:-main}
+    image: ghcr.io/louis-pagnier/nginx:latest
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
     volumes:

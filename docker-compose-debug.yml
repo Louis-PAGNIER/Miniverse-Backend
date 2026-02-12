@@ -116,6 +116,7 @@ services:
     restart: unless-stopped
 
   cleanup:
+    container_name: cleanup
     image: alpine
     volumes:
       - ${HOST_DATA_PATH}/uploads/:/app/data/uploads  # Monte le même dossier que l'API

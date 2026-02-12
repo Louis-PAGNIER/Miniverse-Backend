@@ -115,6 +115,14 @@ services:
       - "miniverse-api:host-gateway"
     restart: unless-stopped
 
+  cleanup:
+    image: alpine
+    volumes:
+      - ${HOST_DATA_PATH}/uploads/:/app/data/uploads  # Monte le même dossier que l'API
+    command: >
+      sh -c "echo '0 * * * * find /app/data/uploads -type f -mmin +1440 -delete' > /etc/crontabs/root && crond -f"
+
+
 networks:
   miniverse-net:
     name: miniverse-net

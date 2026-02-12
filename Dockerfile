@@ -18,14 +18,13 @@ WORKDIR /app
 
 # Copier les fichiers de config poetry
 COPY pyproject.toml poetry.lock poetry.toml* ./
-
-# Installer dépendances (sans venv, directement dans l’image)
 RUN poetry config virtualenvs.create false \
     && poetry install --no-root --no-interaction --no-ansi
 
-# Copie le scirpt de configuration de crond
-COPY entrypoint.sh /entrypoint.sh
-RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
+RUN useradd -u 1000 -m -U miniverse
+RUN chown miniverse:miniverse /app
+
+USER miniverse:miniverse
 
 # Copier ton code
 COPY app ./app
@@ -35,8 +34,6 @@ RUN mkdir -p /app/data
 
 # Exposer ton port (ex : Litestar sur 8000)
 EXPOSE 8000
-
-ENTRYPOINT ["/entrypoint.sh"]
 
 # Lancer ton serveur (adapté si tu utilises Litestar avec uvicorn)
 CMD ["litestar", "--app", "app.main:app", "run", "--debug", "--host", "0.0.0.0", "--port", "8000"]

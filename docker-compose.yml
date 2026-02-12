@@ -3,6 +3,7 @@ services:
     build: .
     image: ghcr.io/louis-pagnier/miniverse-api:latest
     container_name: miniverse-api
+    user: "1000:0"
     volumes:
       - ${HOST_DATA_PATH}:/app/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -116,6 +117,13 @@ services:
     networks:
       backend-net:
     restart: unless-stopped
+
+  cleanup:
+    image: alpine
+    volumes:
+      - ${HOST_DATA_PATH}/uploads/:/app/data/uploads  # Monte le même dossier que l'API
+    command: >
+      sh -c "echo '0 * * * * find /app/data/uploads -type f -mmin +1440 -delete' > /etc/crontabs/root && crond -f"
 
 networks:
   miniverse-net:

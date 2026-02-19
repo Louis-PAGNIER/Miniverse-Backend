@@ -83,7 +83,7 @@ app = Litestar(
     route_handlers=[UsersController, SelfUserController, MiniversesController, FilesController, ModsController, MinecraftController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
     on_startup=[db_startup, proxy_startup, docker_startup, server_status_manager_startup],
-    on_shutdown=[docker_shutdown],  # TODO: Do we really need to shutdown all containers ?
+    on_shutdown=[],
     on_app_init=[jwtAuth.on_app_init],
     openapi_config=OpenAPIConfig(
         title="Miniverse API",

@@ -168,7 +168,7 @@ class MiniversesController(Controller):
 
     @put("/{miniverse_id:str}/roles/{user_id_or_name:str}")
     async def set_user_role(self, current_user: User, miniverse_id: str, user_id_or_name: str, data: RoleSchema, db: AsyncSession) -> None:
-        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+        if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
             raise NotAuthorizedException("You are not authorized to list users of this miniverse")
 
         is_uuid = bool(UUID4_REGEX.match(user_id_or_name))

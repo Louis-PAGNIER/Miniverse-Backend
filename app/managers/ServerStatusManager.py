@@ -1,6 +1,5 @@
 import asyncio
 import json
-from asyncio import sleep
 
 import rich
 import websockets
@@ -104,7 +103,6 @@ class ServerStatusManager:
             player = MSMPPlayer(id=player_id, name="")
             await ws.send(json.dumps({"method": "minecraft:operators/remove", "id": 1, "params": [[player.__dict__]]}))
         await ws.recv()
-        await sleep(1)
         await ServerStatusManager.refresh_msmp_operators_list(miniverse_id, ws)
 
     @staticmethod

@@ -225,31 +225,36 @@ async def list_miniverse_users(miniverse: Miniverse) -> list[User]:
 
 
 async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -> Miniverse:
-    change_name = miniverse.name != data.get("name", miniverse.name)
-    change_subdomain = miniverse.subdomain != data.get("subdomain", miniverse.subdomain)
-    change_version = miniverse.mc_version != data.get("mc_version", miniverse.mc_version)
+    fields_to_update = ["name", "description", "subdomain"]
+    has_changed = False
 
-    if not change_name and not change_subdomain and not change_version:
-        return miniverse
+    for field in fields_to_update:
+        new_value = data.get(field)
+        if new_value is not None and getattr(miniverse, field) != new_value:
+            if field in ["name", "subdomain"]:
+                exists = (await db.execute(
+                    select(Miniverse).where(getattr(Miniverse, field) == new_value)
+                )).scalars().first()
 
-    if change_name:
-        if (await db.execute(select(Miniverse).where(Miniverse.name == data["name"]))).scalars().first():
-            raise ValidationException("The specified Miniverse name is already used.")
-        miniverse.name = data["name"]
+                if exists:
+                    raise ValidationException(f"The specified {field} is already used: {new_value}.")
 
-    if change_subdomain:
-        if (await db.execute(select(Miniverse).where(Miniverse.subdomain == data["subdomain"]))).scalars().first():
-            raise ValidationException("The specified Miniverse subdomain is already used.")
-        miniverse.subdomain = data["subdomain"]
+            setattr(miniverse, field, new_value)
+            has_changed = True
 
-    if change_name or change_subdomain:
+    new_version = data.get("mc_version")
+    version_changed = new_version is not None and miniverse.mc_version != new_version
+
+    if has_changed:
         await db.commit()
         await db.refresh(miniverse)
 
-    if change_version:
-        miniverse = await update_miniverse_game_version(miniverse, data["mc_version"], db)
+    if version_changed:
+        miniverse = await update_miniverse_game_version(miniverse, new_version, db)
+        has_changed = True
 
-    publish_miniverse_updated_event(miniverse.id)
+    if has_changed:
+        publish_miniverse_updated_event(miniverse.id)
 
     return miniverse
 

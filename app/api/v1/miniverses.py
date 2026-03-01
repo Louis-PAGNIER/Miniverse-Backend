@@ -54,7 +54,7 @@ class MiniversesController(Controller):
         await delete_miniverse(miniverse, db)
         return None
 
-    @post("/{miniverse_id:str}/start")
+    @put("/{miniverse_id:str}/start")
     async def start_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.USER:
             raise NotAuthorizedException("You are not authorized to start this miniverse")
@@ -67,7 +67,7 @@ class MiniversesController(Controller):
 
         return miniverse
 
-    @post("/{miniverse_id:str}/stop")
+    @put("/{miniverse_id:str}/stop")
     async def stop_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.USER:
             raise NotAuthorizedException("You are not authorized to stop this miniverse")
@@ -80,7 +80,7 @@ class MiniversesController(Controller):
 
         return miniverse
 
-    @post("/{miniverse_id:str}/restart")
+    @put("/{miniverse_id:str}/restart")
     async def restart_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.USER:
             raise NotAuthorizedException("You are not authorized to restart this miniverse")
@@ -93,9 +93,8 @@ class MiniversesController(Controller):
 
         return miniverse
 
-    @post("/{miniverse_id:str}/update_mc_version")
-    async def update_miniverse(self, current_user: User, miniverse_id: str, data: MiniverseUpdateMCVersion,
-                               db: AsyncSession) -> Miniverse:
+    @put("/{miniverse_id:str}")
+    async def update_miniverse(self, current_user: User, miniverse_id: str, data: dict, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
             raise NotAuthorizedException("You are not authorized to update this miniverse")
 
@@ -103,7 +102,8 @@ class MiniversesController(Controller):
         if miniverse is None:
             raise NotFoundException("Miniverse not found")
 
-        return await update_miniverse(miniverse, data.mc_version, db)
+        return await update_miniverse(miniverse, data, db)
+
 
     @post("/{miniverse_id:str}/install/mod")
     async def automatic_install_mod(self, current_user: User, miniverse_id: str, data: AutomaticInstallMod,

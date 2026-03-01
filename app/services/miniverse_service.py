@@ -224,7 +224,37 @@ async def list_miniverse_users(miniverse: Miniverse) -> list[User]:
     return [user_role.user for user_role in miniverse.users_roles]
 
 
-async def update_miniverse(miniverse: Miniverse, new_mc_version: str, db: AsyncSession,
+async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -> Miniverse:
+    change_name = miniverse.name != data.get("name", miniverse.name)
+    change_subdomain = miniverse.subdomain != data.get("subdomain", miniverse.subdomain)
+    change_version = miniverse.mc_version != data.get("mc_version", miniverse.mc_version)
+
+    if not change_name and not change_subdomain and not change_version:
+        return miniverse
+
+    if change_name:
+        if (await db.execute(select(Miniverse).where(Miniverse.name == data["name"]))).scalars().first():
+            raise ValidationException("The specified Miniverse name is already used.")
+        miniverse.name = data["name"]
+
+    if change_subdomain:
+        if (await db.execute(select(Miniverse).where(Miniverse.subdomain == data["subdomain"]))).scalars().first():
+            raise ValidationException("The specified Miniverse subdomain is already used.")
+        miniverse.subdomain = data["subdomain"]
+
+    if change_name or change_subdomain:
+        await db.commit()
+        await db.refresh(miniverse)
+
+    if change_version:
+        miniverse = await update_miniverse_game_version(miniverse, data["mc_version"], db)
+
+    publish_miniverse_updated_event(miniverse.id)
+
+    return miniverse
+
+
+async def update_miniverse_game_version(miniverse: Miniverse, new_mc_version: str, db: AsyncSession,
                            force_update: bool = False) -> Miniverse:
     if miniverse.mc_version == new_mc_version:
         raise ValidationException("The new Minecraft version is the same as the current one.")

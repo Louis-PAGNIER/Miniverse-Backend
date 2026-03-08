@@ -2,7 +2,7 @@ import shutil
 import zipfile
 import zlib
 from copy import copy
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -106,8 +106,8 @@ def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo
         stats = path.stat()
 
         # TODO: Created is not really creation time on UNIX system, we should probably change this in the future
-        created_at = datetime.fromtimestamp(stats.st_ctime)
-        modified_at = datetime.fromtimestamp(stats.st_mtime)
+        created_at = datetime.fromtimestamp(stats.st_ctime, tz=timezone.utc)
+        modified_at = datetime.fromtimestamp(stats.st_mtime, tz=timezone.utc)
         is_dir = path.is_dir()
         size = stats.st_size if not is_dir else None
 

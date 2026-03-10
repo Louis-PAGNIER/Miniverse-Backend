@@ -215,6 +215,22 @@ yarl = ">=1.17.0,<2.0"
 speedups = ["Brotli (>=1.2) ; platform_python_implementation == \"CPython\"", "aiodns (>=3.3.0)", "backports.zstd ; platform_python_implementation == \"CPython\" and python_version < \"3.14\"", "brotlicffi (>=1.2) ; platform_python_implementation != \"CPython\""]
 
 [[package]]
+name = "aiohttp-socks"
+version = "0.11.0"
+description = "Proxy connector for aiohttp"
+optional = false
+python-versions = ">=3.8.0"
+groups = ["main"]
+files = [
+    { file = "aiohttp_socks-0.11.0-py3-none-any.whl", hash = "sha256:9aacce57c931b8fbf8f6d333cf3cafe4c35b971b35430309e167a35a8aab9ec1" },
+    { file = "aiohttp_socks-0.11.0.tar.gz", hash = "sha256:0afe51638527c79077e4bd6e57052c87c4824233d6e20bb061c53766421b10f0" },
+]
+
+[package.dependencies]
+aiohttp = ">=3.10.0"
+python-socks = { version = ">=2.4.3,<3.0.0", extras = ["asyncio"] }
+
+[[package]]
 name = "aiomysql"
 version = "0.3.2"
 description = "MySQL driver for asyncio."
@@ -297,6 +313,18 @@ idna = ">=2.8"
 
 [package.extras]
 trio = ["trio (>=0.31.0) ; python_version < \"3.10\"", "trio (>=0.32.0) ; python_version >= \"3.10\""]
+
+[[package]]
+name = "async-timeout"
+version = "5.0.1"
+description = "Timeout context manager for asyncio programs"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    { file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c" },
+    { file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3" },
+]
 
 [[package]]
 name = "attrs"
@@ -1113,6 +1141,33 @@ files = [
 
 [package.extras]
 all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
+
+[[package]]
+name = "jsonrpc-base"
+version = "2.2.0"
+description = "A JSON-RPC client library base interface"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    { file = "jsonrpc-base-2.2.0.tar.gz", hash = "sha256:931a9a37c637b46eec7e1f9ba894655f8241381309e89b948d7d278c29f672ba" },
+]
+
+[[package]]
+name = "jsonrpc-websocket"
+version = "3.2.0"
+description = "A JSON-RPC websocket client library for asyncio"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    { file = "jsonrpc_websocket-3.2.0.tar.gz", hash = "sha256:8eaca18c11f3e03197e5fdec53c93023ffb15eb61de6668d2fc8027eb8d09636" },
+]
+
+[package.dependencies]
+aiohttp = ">=3.0.0"
+async-timeout = ">=4.0.0"
+jsonrpc-base = ">=2.1.0"
 
 [[package]]
 name = "jwcrypto"
@@ -3052,4 +3107,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "c25ea2c75aa07c67048db5591af211e14752ca75c1b68a2026b60371698aac85"
+content-hash = "5caf08625e69534cfcb90f4f1522610f9ed767d2f6bf390c4ad58e4ba9a18a2b"

@@ -99,6 +99,9 @@ jobs:
             # Pull the latest image
             docker compose pull
             
+            # Run migrations
+            docker compose run --rm app alembic upgrade head
+            
             # Restart containers
             docker compose up -d --no-build --remove-orphans
             

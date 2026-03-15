@@ -31,6 +31,7 @@ dependencies = [
     "python-keycloak (==7.0.2)",
     "jsonrpc-websocket (==3.2.0)",
     "aiohttp-socks (==0.11.0)",
+    "pymysql (>=1.1.2,<2.0.0)",
 ]
 
 

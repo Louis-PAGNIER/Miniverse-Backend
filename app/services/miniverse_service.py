@@ -225,7 +225,8 @@ async def list_miniverse_users(miniverse: Miniverse) -> list[User]:
 
 
 async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -> Miniverse:
-    fields_to_update = ["name", "description", "subdomain"]
+    fields_to_update = ["name", "description", "subdomain", "allow_bedrock"]
+    changed_fields = set()
     has_changed = False
 
     for field in fields_to_update:
@@ -241,6 +242,7 @@ async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -
 
             setattr(miniverse, field, new_value)
             has_changed = True
+            changed_fields.add(field)
 
     new_version = data.get("mc_version")
     version_changed = new_version is not None and miniverse.mc_version != new_version
@@ -253,6 +255,9 @@ async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -
         miniverse = await update_miniverse_game_version(miniverse, new_version, db)
         has_changed = True
 
+    if len(changed_fields.intersection({'subdomain', 'allow_bedrock'})) > 0:
+        await update_proxy_config(db)
+        
     if has_changed:
         publish_miniverse_updated_event(miniverse.id)
 

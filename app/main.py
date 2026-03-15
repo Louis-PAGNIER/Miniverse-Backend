@@ -30,11 +30,6 @@ async def proxy_startup():
         await update_proxy_config(session)
 
 
-async def db_startup():
-    async with session_config.get_engine().begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
 async def server_status_manager_startup():
     async with session_config.get_session() as session:
         miniverses = await get_miniverses(session)
@@ -82,7 +77,7 @@ app = Litestar(
     response_cache_config=response_cache_config,
     route_handlers=[UsersController, SelfUserController, MiniversesController, FilesController, ModsController, MinecraftController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
-    on_startup=[db_startup, proxy_startup, docker_startup, server_status_manager_startup],
+    on_startup=[proxy_startup, docker_startup, server_status_manager_startup],
     on_shutdown=[],
     on_app_init=[jwtAuth.on_app_init],
     openapi_config=OpenAPIConfig(

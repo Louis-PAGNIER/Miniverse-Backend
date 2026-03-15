@@ -27,7 +27,11 @@ RUN chown miniverse:miniverse /app
 USER miniverse:miniverse
 
 # Copier ton code
-COPY app ./app
+COPY --chown=miniverse:miniverse app ./app
+
+# Copy alembic files
+COPY --chown=miniverse:miniverse alembic ./alembic
+COPY --chown=miniverse:miniverse alembic.ini ./alembic.ini
 
 # Créer le dossier data (même si sera monté en volume au runtime)
 RUN mkdir -p /app/data

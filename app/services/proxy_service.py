@@ -66,6 +66,9 @@ def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
                 "showMaxPlayers": 1000,
             },
             "acceptTransfers": True,
+            "bedrock": {
+                "managed": True,
+            }
         },
         # "api": {
         #     "enabled": True, # Can be enabled to control this service
@@ -113,12 +116,13 @@ async def start_proxy_containers() -> None:
     classic_container = await dockerctl.get_container_by_name("miniverse-gate-classic")
     if classic_container is None:
         classic_container = await dockerctl.create_container(
-            image="ghcr.io/minekube/gate:latest",
+            image="ghcr.io/minekube/gate/jre:latest",
             name="miniverse-gate-classic",
             network_id=settings.DOCKER_NETWORK_NAME,
             volumes={str(classic_proxy_config_path.parent): VolumeConfig(bind="/configs")},
             # ports={"8080/tcp": 8080}, # Can be enabled to control this service
-            entrypoint="/gate",
+            ports={"19132/udp": 19132},
+            entrypoint="/usr/local/bin/gate",
             command=["--config", "/configs/config-classic.yml"],
             auto_remove=True,
         )

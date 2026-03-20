@@ -1,200 +1,32 @@
-import asyncio
-import json
-
-import rich
-import websockets
-from websockets import ClientConnection
-
 from app import logger
-from app.core import root_store, settings
+from app.core import root_store
 from app.core.utils import websocket_uri_from_miniverse_id
-from app.events.miniverse_event import publish_miniverse_players_event, publish_miniverse_ban_player_event
 from app.models import Miniverse
-from app.schemas import Player, MSMPPlayer, MSMPOperator, MSMPPlayerBan
+from app.services.websocket_miniverse_service import WebSocketMiniverseService
 
 server_status_store = root_store.with_namespace("server-status")
 
-class ServerStatusManager:
+
+class ServerStatusStore:
     def __init__(self):
-        self.tasks: dict[str, asyncio.Task] = {}
-        self.timeouts: dict[str, float] = {}
-        self.tries: dict[str, int] = {}
-        self.secrets: dict[str, str] = {}
-
-    def reset_tries(self, miniverse_id: str):
-        self.tries[miniverse_id] = 0
-        self.timeouts[miniverse_id] = 3.0
-
-    def get_next_timeout_and_increment(self, miniverse_id: str) -> float:
-        thresholds = [
-            (30, 60.0),
-            (20, 30.0),
-            (15, 10.0),
-            (0, 3.0)
-        ]
-        if miniverse_id not in self.tries:
-            self.reset_tries(miniverse_id)
-        self.tries[miniverse_id] += 1
-        tries = self.tries[miniverse_id]
-        timeout = next(t for (s, t) in thresholds if tries > s)
-        self.timeouts[miniverse_id] = timeout
-        return timeout
-
-    def get_ws_connection(self, miniverse_id: str):
-        headers = {"Authorization": f"Bearer {self.secrets[miniverse_id]}"}
-        uri = websocket_uri_from_miniverse_id(miniverse_id)
-        return websockets.connect(uri, additional_headers=headers, proxy=settings.PROXY_SOCKS)
+        self._miniverse_control_services: dict[str, WebSocketMiniverseService] = dict()
 
     def add_miniverse(self, miniverse: Miniverse):
-        miniverse_id = miniverse.id
-        if miniverse_id not in self.tasks:
-            self.secrets[miniverse_id] = miniverse.management_server_secret
-            self.tasks[miniverse_id] = asyncio.create_task(self._run_client(miniverse_id))
-            self.reset_tries(miniverse_id)
-            logger.info(f"Started searching for {miniverse_id} management server")
-
-    def remove_miniverse(self, miniverse_id: str):
-        if miniverse_id in self.tasks:
-            self.tasks[miniverse_id].cancel()
-            del self.tasks[miniverse_id]
-            logger.info(f"Stopped searching for {miniverse_id} management server")
-
-    @staticmethod
-    async def refresh_msmp_operators_list(miniverse_id: str, ws: ClientConnection) -> list[MSMPOperator]:
-        await ws.send(json.dumps({"method": "minecraft:operators", "id": 1}))
-        operators_list = json.loads(await ws.recv()).get("result", [])
-        await server_status_store.set(f"{miniverse_id}.operators", json.dumps(operators_list))
-        return [MSMPOperator.from_dict(o) for o in operators_list]
-
-    @staticmethod
-    async def refresh_msmp_banned_players_list(miniverse_id: str, ws: ClientConnection) -> list[MSMPPlayerBan]:
-        await ws.send(json.dumps({"method": "minecraft:bans", "id": 1}))
-        bans = [MSMPPlayerBan.from_dict(p) for p in json.loads(await ws.recv()).get("result", [])]
-        await server_status_store.set(f"{miniverse_id}.bans", json.dumps([p.to_dict() for p in bans]))
-        return bans
-
-    @staticmethod
-    async def get_players_list(miniverse_id: str, ws: ClientConnection) -> list[Player]:
-        await ws.send(json.dumps({"method": "minecraft:players", "id": 1}))
-        msmp_players_list = [MSMPPlayer(**p) for p in json.loads(await ws.recv()).get("result", [])]
-
-        operators_list = await server_status_store.get(f"{miniverse_id}.operators")
-        if operators_list is None:
-            operators_list = await ServerStatusManager.refresh_msmp_operators_list(miniverse_id, ws)
-        else:
-            operators_list = [MSMPOperator.from_dict(o) for o in json.loads(operators_list)]
-        operator_ids = set(o.player.id for o in operators_list)
-
-        players_list = [Player(
-            id=p.id,
-            name=p.name,
-            is_operator=p.id in operator_ids
-        ) for p in msmp_players_list]
-
-        await server_status_store.set(f"{miniverse_id}.players", json.dumps([p.__dict__ for p in players_list]))
-        return players_list
-
-    @staticmethod
-    async def set_player_operator(miniverse_id: str, ws: ClientConnection, player_id: str, is_operator: bool):
-        if is_operator:
-            op = MSMPOperator(permissionLevel=4, bypassesPlayerLimit=True, player=MSMPPlayer(id=player_id, name=""))
-            await ws.send(json.dumps({"method": "minecraft:operators/add", "id": 1, "params": [[op.to_dict()]]}))
-        else:
-            player = MSMPPlayer(id=player_id, name="")
-            await ws.send(json.dumps({"method": "minecraft:operators/remove", "id": 1, "params": [[player.__dict__]]}))
-        await ws.recv()
-        await ServerStatusManager.refresh_msmp_operators_list(miniverse_id, ws)
-
-    @staticmethod
-    async def kick_player(ws: ClientConnection, player_id: str, reason: str):
-        data = {
-            'player': {'id': player_id},
-            'message': {'literal': reason}
-        }
-        await ws.send(json.dumps({"method": "minecraft:players/kick", "id": 1, "params": [[data]]}))
-        await ws.recv()
-
-    @staticmethod
-    async def ban_player(ws: ClientConnection, player_id: str, reason: str):
-        data = {
-            'player': {'id': player_id},
-            'reason': reason
-        }
-        await ws.send(json.dumps({"method": "minecraft:bans/add", "id": 1, "params": [[data]]}))
-        await ws.recv()
-
-    @staticmethod
-    async def unban_player(ws: ClientConnection, player_id: str):
-        data = {'id': player_id}
-        await ws.send(json.dumps({"method": "minecraft:bans/remove", "id": 1, "params": [[data]]}))
-        await ws.recv()
-
-
-    async def _run_client(self, miniverse_id: str):
-        while True: # TODO: Never use while True, this code must timeout after 10min and check each loop if the container we want to connect still exist
-            try:
-                async with self.get_ws_connection(miniverse_id) as ws:
-                    self.reset_tries(miniverse_id)
-                    logger.info(f"Successfully connected to management server for miniverse {miniverse_id}")
-
-                    await self.refresh_msmp_operators_list(miniverse_id, ws)
-                    await self.refresh_msmp_banned_players_list(miniverse_id, ws)
-
-                    players_list = await self.get_players_list(miniverse_id, ws)
-                    publish_miniverse_players_event(miniverse_id, players_list)
-
-                    # TODO refractor the code below in a separate method
-                    try:
-                        async for message in ws:
-                            data = json.loads(message)
-                            await self.handle_management_server_event(miniverse_id, data)
-                    except websockets.exceptions.ConnectionClosed:
-                        return
-                    except Exception as e:
-                        print(e) # This should never happen, this is to display strange behaviors
-                        exit(1)
-            except Exception as e:
-                print(e)
-                timeout = self.get_next_timeout_and_increment(miniverse_id)
-                await asyncio.sleep(timeout)
-
-
-    async def handle_management_server_event(self, miniverse_id: str, data: dict):
-        if (method := data.get("method")) is None:
+        if miniverse.id in self._miniverse_control_services:
+            logger.warn("Trying to add a miniverse that already have a control service")
             return
 
-        if method in ["minecraft:notification/players/joined", "minecraft:notification/players/left"]:
-            async with self.get_ws_connection(miniverse_id) as ws:
-                players_list = await self.get_players_list(miniverse_id, ws)
-                publish_miniverse_players_event(miniverse_id, players_list)
+        control = WebSocketMiniverseService(miniverse.id, websocket_uri_from_miniverse_id(miniverse.id),
+                                            miniverse.management_server_secret)
+        self._miniverse_control_services[miniverse.id] = control
 
-        elif method in ["minecraft:notification/operators/added", "minecraft:notification/operators/removed"]:
-            async with self.get_ws_connection(miniverse_id) as ws:
-                await self.refresh_msmp_operators_list(miniverse_id, ws)
-                players_list = await self.get_players_list(miniverse_id, ws)
-                publish_miniverse_players_event(miniverse_id, players_list)
+    def remove_miniverse(self, miniverse_id: str):
+        control = self._miniverse_control_services.pop(miniverse_id, None)
+        control.stop()
+        logger.info(f"Stopped searching for {miniverse_id} management server")
 
-        elif method in ["minecraft:notification/bans/added", "minecraft:notification/bans/removed"]:
-            async with self.get_ws_connection(miniverse_id) as ws:
-                banned_players = await self.refresh_msmp_banned_players_list(miniverse_id, ws)
-                publish_miniverse_ban_player_event(miniverse_id, banned_players)
-
-        elif method == "minecraft:notification/server/saving":
-            logger.info(f"Server save started for miniverse {miniverse_id}")
-
-        elif method == "minecraft:notification/server/saved":
-            logger.info(f"Server save completed for miniverse {miniverse_id}")
-
-        elif method == "minecraft:notification/server/started":
-            logger.info(f"Miniverse {miniverse_id} started")
-
-        elif method == "minecraft:notification/server/stopping":
-            logger.info(f"Miniverse {miniverse_id} is stopping...")
-
-        else:
-            logger.info(f"Miniverse {miniverse_id} said :")
-            rich.print_json(data=data)  # For debugging purposes
-            pass
+    def get_miniverse_controler(self, miniverse_id: str):
+        return self._miniverse_control_services.get(miniverse_id, None)
 
 
-server_status_manager = ServerStatusManager()
+server_status_manager = ServerStatusStore()

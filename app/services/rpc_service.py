@@ -41,7 +41,8 @@ class RpcService:
         while True:
             connector = None
             if settings.PROXY_SOCKS:
-                connector = ProxyConnector.from_url(settings.PROXY_SOCKS)
+                proxy_url = settings.PROXY_SOCKS.replace("socks5h://", "socks5://")
+                connector = ProxyConnector.from_url(proxy_url)
             async with aiohttp.ClientSession(connector=connector) as session:
                 server = Server(
                     url=self.url,
@@ -51,7 +52,11 @@ class RpcService:
 
                 try:
                     await server.ws_connect()
-                    self._server = server
+                    self.server = server
+
+                    while server.connected:
+                        await asyncio.sleep(1)
+
                 except websockets.exceptions.ConnectionClosed:
                     logger.warning("Connexion fermée par le serveur.")
                 except Exception as e:
@@ -60,6 +65,6 @@ class RpcService:
                     await server.close()
 
             # Si on sort du bloc 'async with', on est déconnecté
-            self._server = None
+            self.server = None
             logger.info("Tentative de reconnexion dans 3 secondes...")
             await asyncio.sleep(3)  # Délai avant de tenter de se reconnecter

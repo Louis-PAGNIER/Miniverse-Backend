@@ -18,7 +18,6 @@ from app.api.v1.websockets import websocket_miniverse_updates_handler, websocket
 from app.core.channels import channels_plugin
 from app.db import Base
 from app.db.session import session_config
-from app.managers.ServerStatusManager import server_status_manager
 from app.services.auth_service import jwtAuth
 from app.services.docker_service import dockerctl
 from app.services.miniverse_service import get_miniverses, start_miniverse, stop_miniverse_container
@@ -28,15 +27,6 @@ from app.services.proxy_service import start_proxy_containers, update_proxy_conf
 async def proxy_startup():
     async with session_config.get_session() as session:
         await update_proxy_config(session)
-
-
-async def server_status_manager_startup():
-    async with session_config.get_session() as session:
-        miniverses = await get_miniverses(session)
-        for miniverse in miniverses:
-            if miniverse.started:
-                server_status_manager.add_miniverse(miniverse)
-
 
 async def docker_startup():
     await start_proxy_containers()
@@ -77,7 +67,7 @@ app = Litestar(
     response_cache_config=response_cache_config,
     route_handlers=[UsersController, SelfUserController, MiniversesController, FilesController, ModsController, MinecraftController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
-    on_startup=[proxy_startup, docker_startup, server_status_manager_startup],
+    on_startup=[proxy_startup, docker_startup],
     on_shutdown=[],
     on_app_init=[jwtAuth.on_app_init],
     openapi_config=OpenAPIConfig(

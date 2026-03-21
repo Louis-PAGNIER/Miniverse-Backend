@@ -7,7 +7,7 @@ from app.services.websocket_miniverse_service import WebSocketMiniverseService
 server_status_store = root_store.with_namespace("server-status")
 
 
-class ServerStatusStore:
+class MiniversesManager:
     def __init__(self):
         self._miniverse_control_services: dict[str, WebSocketMiniverseService] = dict()
 
@@ -22,11 +22,12 @@ class ServerStatusStore:
 
     def remove_miniverse(self, miniverse_id: str):
         control = self._miniverse_control_services.pop(miniverse_id, None)
-        control.stop()
+        if control is not None:
+            control.stop()
         logger.info(f"Stopped searching for {miniverse_id} management server")
 
     def get_miniverse_controler(self, miniverse_id: str):
         return self._miniverse_control_services.get(miniverse_id, None)
 
 
-server_status_manager = ServerStatusStore()
+miniverses_manager = MiniversesManager()

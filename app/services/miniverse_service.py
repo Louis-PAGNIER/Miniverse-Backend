@@ -13,7 +13,7 @@ from app.core.utils import generate_random_string
 from app.enums import MiniverseType, Role
 from app.events.miniverse_event import publish_miniverse_deleted_event, publish_miniverse_created_event, \
     publish_miniverse_updated_event, user_list_from_user_role_list
-from app.managers import server_status_manager
+from app.managers import miniverses_manager
 from app.models import Miniverse, MiniverseUserRole, User
 from app.schemas import ModUpdateStatus
 from app.schemas.miniverse import MiniverseCreate
@@ -77,7 +77,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
 
 async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
     miniverse_id = miniverse.id
-    server_status_manager.remove_miniverse(miniverse_id)
+    miniverses_manager.remove_miniverse(miniverse_id)
     if miniverse.container_id:
         # remove_container also stops the container if it's running using force=True (SIGKILL)
         logger.info(f"Deleting miniverse {miniverse.name} (ID: {miniverse_id})")
@@ -166,7 +166,7 @@ async def start_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
     await db.commit()
     await db.refresh(miniverse)
 
-    server_status_manager.add_miniverse(miniverse)
+    miniverses_manager.add_miniverse(miniverse)
 
     existing_container = await dockerctl.get_container_by_name("miniverse-" + miniverse.id)
     if existing_container:
@@ -205,7 +205,7 @@ async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
     await db.commit()
     await db.refresh(miniverse)
 
-    server_status_manager.remove_miniverse(miniverse.id)
+    miniverses_manager.remove_miniverse(miniverse.id)
 
     publish_miniverse_updated_event(miniverse.id)
 
@@ -216,7 +216,8 @@ async def restart_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
 
 
 async def get_miniverse_user_role(miniverse_id: str, user_id: str, db: AsyncSession) -> MiniverseUserRole:
-    res = await db.execute(select(MiniverseUserRole).where(MiniverseUserRole.user_id == user_id, MiniverseUserRole.miniverse_id == miniverse_id))
+    res = await db.execute(select(MiniverseUserRole).where(MiniverseUserRole.user_id == user_id,
+                                                           MiniverseUserRole.miniverse_id == miniverse_id))
     return res.scalars().first()
 
 
@@ -257,7 +258,7 @@ async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -
 
     if len(changed_fields.intersection({'subdomain', 'allow_bedrock'})) > 0:
         await update_proxy_config(db)
-        
+
     if has_changed:
         publish_miniverse_updated_event(miniverse.id)
 
@@ -265,7 +266,7 @@ async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -
 
 
 async def update_miniverse_game_version(miniverse: Miniverse, new_mc_version: str, db: AsyncSession,
-                           force_update: bool = False) -> Miniverse:
+                                        force_update: bool = False) -> Miniverse:
     if miniverse.mc_version == new_mc_version:
         raise ValidationException("The new Minecraft version is the same as the current one.")
 
@@ -311,17 +312,16 @@ async def update_miniverse_game_version(miniverse: Miniverse, new_mc_version: st
 
 
 async def miniverse_set_player_operator(miniverse: Miniverse, player_id: str, operator: bool):
-    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
-        await server_status_manager.set_player_operator(miniverse.id, ws, player_id, operator)
+    return await miniverses_manager.get_miniverse_controler(miniverse.id).set_player_operator(player_id, operator)
+
 
 async def miniverse_kick_player(miniverse: Miniverse, player_id: str, reason: str):
-    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
-        await server_status_manager.kick_player(ws, player_id, reason)
+    return await miniverses_manager.get_miniverse_controler(miniverse.id).kick_player(player_id, reason)
+
 
 async def miniverse_ban_player(miniverse: Miniverse, player_id: str, reason: str):
-    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
-        await server_status_manager.ban_player(ws, player_id, reason)
+    return await miniverses_manager.get_miniverse_controler(miniverse.id).ban_player(player_id, reason)
+
 
 async def miniverse_unban_player(miniverse: Miniverse, player_id: str):
-    async with server_status_manager.get_ws_connection(miniverse.id) as ws:
-        await server_status_manager.unban_player(ws, player_id)
+    return await miniverses_manager.get_miniverse_controler(miniverse.id).unban_player(player_id)

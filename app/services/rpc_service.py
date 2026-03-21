@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable, Coroutine, Any
+from typing import Callable
 
 import aiohttp
 import websockets
@@ -26,17 +26,19 @@ class RpcService:
     @server.setter
     def server(self, value):
         self._server = value
-        if value is not None:
+        if value is None:
+            self._connected.clear()
+        else:
             self._connected.set()
 
-    async def call_rpc(self, method_name: str, *args, **kwargs):
+    async def async_call_rpc(self, method_name: str, *args, **kwargs):
         method = getattr(await self.server, method_name)
         return await method(*args, **kwargs)
 
-    async def add_handler(self, method_name: str, callback: Callable[[dict], None] | Coroutine[Any, Any, None]):
+    async def async_add_handler(self, method_name: str, callback: Callable):
         return setattr(await self.server, method_name, callback)
 
-    async def connect_loop(self):
+    async def async_connect_loop(self):
         """Boucle de connexion avec reconnexion automatique basique."""
         while True:
             connector = None
@@ -59,12 +61,13 @@ class RpcService:
 
                 except websockets.exceptions.ConnectionClosed:
                     logger.warning("Connexion fermée par le serveur.")
+                except ConnectionRefusedError as e:
+                    logger.debug(e)
                 except Exception as e:
                     logger.error(f"Erreur de connexion : {e}")
                 finally:
                     await server.close()
+                    self.server = None
 
-            # Si on sort du bloc 'async with', on est déconnecté
-            self.server = None
-            logger.info("Tentative de reconnexion dans 3 secondes...")
+            logger.debug("Tentative de reconnexion dans 3 secondes...")
             await asyncio.sleep(3)  # Délai avant de tenter de se reconnecter

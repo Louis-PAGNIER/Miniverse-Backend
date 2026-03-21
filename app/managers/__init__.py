@@ -1,1 +1,1 @@
-from .ServerStatusManager import server_status_manager
+from .ServerStatusManager import miniverses_manager

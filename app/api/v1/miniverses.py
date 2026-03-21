@@ -1,4 +1,3 @@
-import json
 import re
 
 from litestar import get, post, Controller, delete, put
@@ -9,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db_session
 from app.enums import Role
 from app.events.miniverse_event import publish_miniverse_updated_event
-from app.managers.ServerStatusManager import server_status_store
+from app.managers.ServerStatusManager import miniverses_manager
 from app.models import Miniverse, Mod, User, MiniverseUserRole
-from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod, \
-    MSMPPlayerBan
+from app.schemas import MiniverseCreate, ModUpdateInfo, AutomaticInstallMod, \
+    MSMPPlayerBan, MSMPPlayer
 from app.schemas.user import RoleSchema
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
@@ -104,7 +103,6 @@ class MiniversesController(Controller):
 
         return await update_miniverse(miniverse, data, db)
 
-
     @post("/{miniverse_id:str}/install/mod")
     async def automatic_install_mod(self, current_user: User, miniverse_id: str, data: AutomaticInstallMod,
                                     db: AsyncSession) -> Mod:
@@ -167,7 +165,8 @@ class MiniversesController(Controller):
         return users
 
     @put("/{miniverse_id:str}/roles/{user_id_or_name:str}")
-    async def set_user_role(self, current_user: User, miniverse_id: str, user_id_or_name: str, data: RoleSchema, db: AsyncSession) -> None:
+    async def set_user_role(self, current_user: User, miniverse_id: str, user_id_or_name: str, data: RoleSchema,
+                            db: AsyncSession) -> None:
         if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
             raise NotAuthorizedException("You are not authorized to list users of this miniverse")
 
@@ -198,23 +197,18 @@ class MiniversesController(Controller):
         await db.commit()
         publish_miniverse_updated_event(miniverse_id, [user.id])
 
-
     @get("/players")
-    async def list_all_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:
+    async def list_all_players(self, current_user: User, db: AsyncSession) -> dict[str, list[MSMPPlayer]]:
         miniverses = await get_miniverses(db)
         miniverses = [m for m in miniverses if current_user.get_miniverse_role(m.id) >= Role.USER]
 
-        result: dict[str, list[Player]] = {}
+        result: dict[str, list[MSMPPlayer]] = {}
         for miniverse in miniverses:
             if not miniverse.started:
                 result[miniverse.id] = []
                 continue
 
-            json_raw = await server_status_store.get(f"{miniverse.id}.players")
-            if json_raw is None:
-                result[miniverse.id] = []
-            else:
-                result[miniverse.id] = json.loads(json_raw)
+            result[miniverse.id] = await miniverses_manager.get_miniverse_controler(miniverse.id).get_msmp_player_list()
 
         return result
 
@@ -229,11 +223,8 @@ class MiniversesController(Controller):
                 result[miniverse.id] = []
                 continue
 
-            json_raw = await server_status_store.get(f"{miniverse.id}.bans")
-            if json_raw is None:
-                result[miniverse.id] = []
-            else:
-                result[miniverse.id] = json.loads(json_raw)
+            result[miniverse.id] = await miniverses_manager.get_miniverse_controler(
+                miniverse.id).get_msmp_banned_player_list()
 
         return result
 

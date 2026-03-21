@@ -21,6 +21,7 @@ from app.services.docker_service import dockerctl, VolumeConfig
 from app.services.minecraft_service import parse_version, compare_versions
 from app.services.mods_service import automatic_mod_install, list_possible_mod_updates, update_mod
 from app.services.proxy_service import update_proxy_config
+from app.services.websocket_miniverse_service import server_status_store
 
 
 def get_miniverse_path(miniverse_id: str, *subpaths: str, from_host: bool = False) -> Path:
@@ -89,6 +90,7 @@ async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
 
     await db.delete(miniverse)
     await db.commit()
+    await server_status_store.delete_miniverse_cache(miniverse_id)
     await update_proxy_config(db)
 
     publish_miniverse_deleted_event(miniverse_id, user_list_from_user_role_list(miniverse.users_roles))

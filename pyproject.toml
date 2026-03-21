@@ -32,12 +32,9 @@ dependencies = [
     "jsonrpc-websocket (==3.2.0)",
     "aiohttp-socks (==0.11.0)",
     "pymysql (>=1.1.2,<2.0.0)",
+    "minekube-gate-grpc-python>=1.78.0.1.20250516132630",
+    "minekube-gate-protocolbuffers-python>=34.1.0.1.20250516132630",
 ]
 
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry]
-package-mode = false
+[[tool.uv.index]]
+url = "https://buf.build/gen/python"

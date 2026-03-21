@@ -134,7 +134,7 @@ class WebSocketMiniverseService:
 
     async def get_msmp_seen_player_list(self) -> list[MSMPPlayer]:
         seen_player_dict = (await server_status_store.get(self.miniverse_id, "miniverse:seen_players")) or {}
-        return [MSMPPlayer(**p) for _, p in seen_player_dict.values()]
+        return [MSMPPlayer(**p) for p in seen_player_dict.values()]
 
     async def get_msmp_operator_list(self, refresh_cache=False) -> list[MSMPOperator]:
         operators, _ = await self._get_data_cached("minecraft:operators", refresh_cache)

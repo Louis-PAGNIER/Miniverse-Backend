@@ -9,8 +9,8 @@ from app.models import MiniverseUserRole
 @dataclass
 class MiniverseEvent:
     type: EventType
-    miniverse_id: str
     data: dict | list
+    miniverse_id: str | None = None
     updated_user_ids: list[str] | None = None
 
     @staticmethod

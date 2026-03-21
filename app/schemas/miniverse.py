@@ -1,9 +1,25 @@
-from dataclasses import dataclass
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
+
 from app.enums import MiniverseType
 
 
-@dataclass
-class MiniverseCreate:
+class MiniverseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    type: MiniverseType
+    description: Optional[str] = None
+    mc_version: str
+    subdomain: str
+    is_on_lite_proxy: bool
+    allow_bedrock: bool
+    started: bool
+
+
+class MiniverseCreate(BaseModel):
     name: str
     type: MiniverseType
     description: str | None
@@ -11,10 +27,10 @@ class MiniverseCreate:
     subdomain: str | None
     is_on_lite_proxy: bool
 
-@dataclass
-class MiniverseUpdateMCVersion:
+
+class MiniverseUpdateMCVersion(BaseModel):
     mc_version: str
 
-@dataclass
-class AutomaticInstallMod:
+
+class AutomaticInstallMod(BaseModel):
     mod_id: str

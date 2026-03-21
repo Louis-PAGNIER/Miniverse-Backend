@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -8,7 +10,7 @@ class MSMPPlayer(BaseModel):
 
 class MSMPPlayerBan(BaseModel):
     reason: str
-    expires: str
+    expires: Optional[str] = None
     source: str
     player: MSMPPlayer
 

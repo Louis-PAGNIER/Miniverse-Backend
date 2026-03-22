@@ -67,6 +67,7 @@ def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
             },
             "acceptTransfers": True,
             "bedrock": {
+                "enabled": True,
                 "managed": {
                     "enabled": True,
                     "autoUpdate": True,

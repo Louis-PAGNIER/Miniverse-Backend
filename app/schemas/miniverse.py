@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 from app.enums import MiniverseType
+from app.schemas.mods import ModSchema
 
 
 class MiniverseSchema(BaseModel):
@@ -17,6 +18,7 @@ class MiniverseSchema(BaseModel):
     is_on_lite_proxy: bool
     allow_bedrock: bool
     started: bool
+    mods: list[ModSchema]
 
 
 class MiniverseCreate(BaseModel):

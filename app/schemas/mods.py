@@ -3,8 +3,24 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Literal
 
+from pydantic import BaseModel, ConfigDict
+
 
 # TODO: ça exit un décorateur qui fait auto le from_dict ?
+
+class ModSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    slug: str
+    version_id: Optional[str] = None
+    project_id: Optional[str] = None
+    title: str
+    icon_url: Optional[str] = None
+    version_name: Optional[str] = None
+    version_number: Optional[str] = None
+    miniverse_id: str
+
 
 class ModrinthProjectType(enum.Enum):
     MOD = "mod"

@@ -3,7 +3,7 @@ from typing import Callable
 
 import aiohttp
 import websockets
-from aiohttp_socks import ProxyConnector
+from aiohttp_socks import ProxyConnector, ProxyError
 from jsonrpc_websocket import Server
 
 from app import logger
@@ -61,6 +61,11 @@ class RpcService:
 
                 except websockets.exceptions.ConnectionClosed:
                     logger.warning("Connexion fermée par le serveur.")
+                except ProxyError as e:
+                    if e.args[0] == "Host unreachable":
+                        logger.debug(e)
+                    else:
+                        logger.error(e)
                 except ConnectionRefusedError as e:
                     logger.debug(e)
                 except Exception as e:

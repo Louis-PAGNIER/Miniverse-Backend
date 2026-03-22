@@ -99,6 +99,11 @@ class AsyncDockerController:
             lambda: self.client.containers.get(container_id).start()
         )
 
+    async def exec_container(self, container_id: str, command: str | list[str]):
+        return await asyncio.to_thread(
+            lambda: self.client.containers.get(container_id).exec_run(command)
+        )
+
     async def stop_container(self, container_id: str):
         return await asyncio.to_thread(
             lambda: self.client.containers.get(container_id).stop()

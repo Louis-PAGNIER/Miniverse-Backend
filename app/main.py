@@ -33,7 +33,9 @@ async def miniverse_controller_manager_startup():
     async with session_config.get_session() as session:
         miniverses = await get_miniverses(session)
         for miniverse in miniverses:
-            miniverses_manager.add_miniverse(miniverse)
+            control = miniverses_manager.add_miniverse(miniverse)
+            if miniverse.started:
+                control.start()
 
 
 async def docker_startup():
@@ -76,7 +78,7 @@ app = Litestar(
     route_handlers=[UsersController, SelfUserController, MiniversesController, FilesController, ModsController,
                     MinecraftController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
-    on_startup=[proxy_startup, docker_startup, miniverse_controller_manager_startup],
+    on_startup=[proxy_startup, miniverse_controller_manager_startup, docker_startup],
     on_shutdown=[],
     on_app_init=[jwtAuth.on_app_init],
     openapi_config=OpenAPIConfig(

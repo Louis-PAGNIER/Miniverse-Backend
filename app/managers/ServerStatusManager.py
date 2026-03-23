@@ -11,15 +11,16 @@ class MiniversesManager:
     def __init__(self):
         self._miniverse_control_services: dict[str, WebSocketMiniverseService] = dict()
 
-    def add_miniverse(self, miniverse: Miniverse):
+    def add_miniverse(self, miniverse: Miniverse) -> WebSocketMiniverseService:
         existing_control = self._miniverse_control_services.get(miniverse.id, None)
         if existing_control is not None:
             existing_control.start()
-            return
+            return existing_control
 
         control = WebSocketMiniverseService(miniverse.id, websocket_uri_from_miniverse_id(miniverse.id),
                                             miniverse.management_server_secret)
         self._miniverse_control_services[miniverse.id] = control
+        return control
 
     async def remove_miniverse(self, miniverse_id: str):
         control = self._miniverse_control_services.pop(miniverse_id, None)

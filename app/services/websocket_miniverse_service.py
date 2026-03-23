@@ -52,15 +52,19 @@ class WebSocketMiniverseService:
         self.rpc: RpcService = RpcService(url, secret)
         self.task = None
 
-        self.start()
-
     def start(self):
-        self.task: asyncio.Task = asyncio.create_task(self.rpc.async_connect_loop(on_connect=self.on_connect))
+        if self.task is None:
+            self.task: asyncio.Task = asyncio.create_task(self.rpc.async_connect_loop(on_connect=self.on_connect))
+        else:
+            logger.warn(f"WebSocket miniverse {self.miniverse_id} already started")
 
     async def stop(self):
         await self.get_msmp_player_list(
             refresh_cache=True)  # Refresh cache before stopping websocket (in case of server crash)
-        self.task.cancel()
+        if self.task is not None:
+            self.task.cancel()
+        else:
+            logger.warn(f"WebSocket miniverse {self.miniverse_id} already stopped")
         self.task = None
 
     async def on_connect(self):

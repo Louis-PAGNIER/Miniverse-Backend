@@ -179,6 +179,7 @@ async def start_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
 
     container = await create_miniverse_container(miniverse, db)
     await dockerctl.start_container(container["Id"])
+    miniverses_manager.get_miniverse_controller(miniverse.id).start()
 
     publish_miniverse_updated_event(miniverse.id)
 
@@ -200,6 +201,8 @@ async def stop_miniverse_container(miniverse: Miniverse) -> None:
 
 async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
     await stop_miniverse_container(miniverse)
+
+    await miniverses_manager.get_miniverse_controller(miniverse.id).stop()
 
     miniverse.started = False
     miniverse.container_id = None

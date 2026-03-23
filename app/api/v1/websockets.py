@@ -51,16 +51,14 @@ async def send_init_data(socket: WebSocket, ctx: WebsocketContext, db: AsyncSess
 
     data = []
     for miniverse in miniverses:
-        controler: WebSocketMiniverseService | None = miniverses_manager.get_miniverse_controler(miniverse.id)
-        if controler is None:
-            data.append({'miniverse': miniverse})
-            continue
+        controller: WebSocketMiniverseService | None = miniverses_manager.get_miniverse_controller(miniverse.id)
+        assert controller is not None
 
         players, seen_players, operators, banned_players = await asyncio.gather(
-            controler.get_msmp_player_list(),
-            controler.get_msmp_seen_player_list(),
-            controler.get_msmp_operator_list(),
-            controler.get_msmp_banned_player_list(),
+            controller.get_msmp_player_list(),
+            controller.get_msmp_seen_player_list(),
+            controller.get_msmp_operator_list(),
+            controller.get_msmp_banned_player_list(),
         )
         data.append(SyncEventItem(
             miniverse=MiniverseSchema.model_validate(miniverse),

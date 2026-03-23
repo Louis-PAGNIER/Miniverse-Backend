@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable
+from typing import Callable, Coroutine, Any
 
 import aiohttp
 import websockets
@@ -14,31 +14,18 @@ class RpcService:
     def __init__(self, url: str, secret: str):
         self.url = url
         self.headers = {"Authorization": f"Bearer {secret}"}
-        self._server: Server | None = None
-        self._connected = asyncio.Event()
-
-    @property
-    async def server(self) -> Server:
-        await self._connected.wait()
-        assert self._server is not None
-        return self._server
-
-    @server.setter
-    def server(self, value):
-        self._server = value
-        if value is None:
-            self._connected.clear()
-        else:
-            self._connected.set()
+        self.server: Server | None = None
 
     async def async_call_rpc(self, method_name: str, *args, **kwargs):
-        method = getattr(await self.server, method_name)
+        if self.server is None:
+            return None
+        method = getattr(self.server, method_name)
         return await method(*args, **kwargs)
 
-    async def async_add_handler(self, method_name: str, callback: Callable):
-        return setattr(await self.server, method_name, callback)
+    def async_add_handler(self, method_name: str, callback: Callable):
+        return setattr(self.server, method_name, callback)
 
-    async def async_connect_loop(self):
+    async def async_connect_loop(self, on_connect: Callable[[], Coroutine[Any, Any, None]]):
         """Boucle de connexion avec reconnexion automatique basique."""
         while True:
             connector = None
@@ -56,13 +43,14 @@ class RpcService:
                     await server.ws_connect()
                     self.server = server
 
+                    await on_connect()
                     while server.connected:
                         await asyncio.sleep(1)
 
                 except websockets.exceptions.ConnectionClosed:
                     logger.warning("Connexion fermée par le serveur.")
                 except ProxyError as e:
-                    if e.args[0] == "Host unreachable":
+                    if e.args[0] in ["Host unreachable", "Connection refused by destination host"]:
                         logger.debug(e)
                     else:
                         logger.error(e)

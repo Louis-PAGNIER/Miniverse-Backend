@@ -208,7 +208,8 @@ class MiniversesController(Controller):
                 result[miniverse.id] = []
                 continue
 
-            result[miniverse.id] = await miniverses_manager.get_miniverse_controler(miniverse.id).get_msmp_player_list()
+            result[miniverse.id] = await miniverses_manager.get_miniverse_controller(
+                miniverse.id).get_msmp_player_list()
 
         return result
 
@@ -223,7 +224,7 @@ class MiniversesController(Controller):
                 result[miniverse.id] = []
                 continue
 
-            result[miniverse.id] = await miniverses_manager.get_miniverse_controler(
+            result[miniverse.id] = await miniverses_manager.get_miniverse_controller(
                 miniverse.id).get_msmp_banned_player_list()
 
         return result
@@ -235,7 +236,9 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to set operators in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_set_player_operator(miniverse, player_id, value)
+        result = await miniverse_set_player_operator(miniverse, player_id, value)
+        if not result:
+            raise NotFoundException("Cannot set operator")
 
     @post("/{miniverse_id:str}/kick")
     async def kick_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
@@ -244,7 +247,9 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to kick players in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_kick_player(miniverse, player_id, reason)
+        result = await miniverse_kick_player(miniverse, player_id, reason)
+        if not result:
+            raise NotFoundException("Cannot kick player")
 
     @post("/{miniverse_id:str}/ban")
     async def ban_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
@@ -253,7 +258,9 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to ban players in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_ban_player(miniverse, player_id, reason)
+        result = await miniverse_ban_player(miniverse, player_id, reason)
+        if not result:
+            raise NotFoundException("Cannot ban player")
 
     @post("/{miniverse_id:str}/unban")
     async def unban_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession) -> None:
@@ -261,4 +268,6 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to unban players in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_unban_player(miniverse, player_id)
+        result = await miniverse_unban_player(miniverse, player_id)
+        if not result:
+            raise NotFoundException("Cannot pardon player")

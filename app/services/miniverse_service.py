@@ -70,6 +70,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
 
     await start_miniverse(db_miniverse, db)
     await update_proxy_config(db)
+    miniverses_manager.add_miniverse(miniverse)
 
     publish_miniverse_created_event(db_miniverse.id, user_list_from_user_role_list(db_miniverse.users_roles))
 
@@ -78,7 +79,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
 
 async def delete_miniverse(miniverse: Miniverse, db: AsyncSession):
     miniverse_id = miniverse.id
-    miniverses_manager.remove_miniverse(miniverse_id)
+    await miniverses_manager.remove_miniverse(miniverse_id)
     if miniverse.container_id:
         # remove_container also stops the container if it's running using force=True (SIGKILL)
         logger.info(f"Deleting miniverse {miniverse.name} (ID: {miniverse_id})")
@@ -168,8 +169,6 @@ async def start_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
     await db.commit()
     await db.refresh(miniverse)
 
-    miniverses_manager.add_miniverse(miniverse)
-
     existing_container = await dockerctl.get_container_by_name("miniverse-" + miniverse.id)
     if existing_container:
         miniverse.container_id = existing_container["Id"]
@@ -206,8 +205,6 @@ async def stop_miniverse(miniverse: Miniverse, db: AsyncSession) -> None:
     miniverse.container_id = None
     await db.commit()
     await db.refresh(miniverse)
-
-    miniverses_manager.remove_miniverse(miniverse.id)
 
     publish_miniverse_updated_event(miniverse.id)
 
@@ -313,17 +310,17 @@ async def update_miniverse_game_version(miniverse: Miniverse, new_mc_version: st
     return miniverse
 
 
-async def miniverse_set_player_operator(miniverse: Miniverse, player_id: str, operator: bool):
-    return await miniverses_manager.get_miniverse_controler(miniverse.id).set_player_operator(player_id, operator)
+async def miniverse_set_player_operator(miniverse: Miniverse, player_id: str, operator: bool) -> bool:
+    return await miniverses_manager.get_miniverse_controller(miniverse.id).set_player_operator(player_id, operator)
 
 
-async def miniverse_kick_player(miniverse: Miniverse, player_id: str, reason: str):
-    return await miniverses_manager.get_miniverse_controler(miniverse.id).kick_player(player_id, reason)
+async def miniverse_kick_player(miniverse: Miniverse, player_id: str, reason: str) -> bool:
+    return await miniverses_manager.get_miniverse_controller(miniverse.id).kick_player(player_id, reason)
 
 
-async def miniverse_ban_player(miniverse: Miniverse, player_id: str, reason: str):
-    return await miniverses_manager.get_miniverse_controler(miniverse.id).ban_player(player_id, reason)
+async def miniverse_ban_player(miniverse: Miniverse, player_id: str, reason: str) -> bool:
+    return await miniverses_manager.get_miniverse_controller(miniverse.id).ban_player(player_id, reason)
 
 
-async def miniverse_unban_player(miniverse: Miniverse, player_id: str):
-    return await miniverses_manager.get_miniverse_controler(miniverse.id).unban_player(player_id)
+async def miniverse_unban_player(miniverse: Miniverse, player_id: str) -> bool:
+    return await miniverses_manager.get_miniverse_controller(miniverse.id).unban_player(player_id)

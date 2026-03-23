@@ -15,12 +15,20 @@ class ServerStatusStore:
     def __init__(self, redis_store: RedisStore):
         self.redis_store = redis_store
 
-    async def set(self, miniverse_id: str, method_name: str, value: dict | list, publish=True) -> None:
+    async def set(self, miniverse_id: str, method_name: str, value: dict | list | None, publish=True) -> None:
         key = f"{miniverse_id}.{method_name}"
         old_json_value = await self.redis_store.get(key)
-        json_value = json.dumps(value)
+
+        if value is not None:
+            json_value = json.dumps(value)
+        else:
+            json_value = None
+
         if old_json_value != json_value:
-            await self.redis_store.set(key, json_value)
+            if json_value is not None:
+                await self.redis_store.set(key, json_value)
+            else:
+                await self.redis_store.delete(key)
             if publish:
                 publish_miniverse_control_event(miniverse_id, EventType(method_name), value)
 
@@ -42,53 +50,56 @@ class WebSocketMiniverseService:
     def __init__(self, miniverse_id: str, url: str, secret: str):
         self.miniverse_id = miniverse_id
         self.rpc: RpcService = RpcService(url, secret)
+        self.task = None
+
+        self.start()
+
+    def start(self):
+        self.task: asyncio.Task = asyncio.create_task(self.rpc.async_connect_loop(on_connect=self.on_connect))
+
+    async def stop(self):
+        await self.get_msmp_player_list(
+            refresh_cache=True)  # Refresh cache before stopping websocket (in case of server crash)
+        self.task.cancel()
+        self.task = None
+
+    async def on_connect(self):
         self._add_handlers()
 
-        self.task: asyncio.Task = asyncio.create_task(self.rpc.async_connect_loop())
-
-    def _add_handlers(self) -> None:
-        coro_list = [
-            self.rpc.async_add_handler("minecraft:notification/players/joined",
-                                       callback=self._handle_msmp_player_list),
-            self.rpc.async_add_handler("minecraft:notification/players/left",
-                                       callback=self._handle_msmp_player_list),
-
-            self.rpc.async_add_handler("minecraft:notification/operators/added",
-                                       callback=self._handle_msmp_operator_list),
-            self.rpc.async_add_handler("minecraft:notification/operators/removed",
-                                       callback=self._handle_msmp_operator_list),
-
-            self.rpc.async_add_handler("minecraft:notification/bans/added",
-                                       callback=self._handle_msmp_banned_player_list),
-            self.rpc.async_add_handler("minecraft:notification/bans/removed",
-                                       callback=self._handle_msmp_banned_player_list),
-
-            self.rpc.async_add_handler("minecraft:notification/server/saving",
-                                       callback=self._handle_server_saving),
-
-            self.rpc.async_add_handler("minecraft:notification/server/saved",
-                                       callback=self._handle_server_saved),
-
-            self.rpc.async_add_handler("minecraft:notification/server/started",
-                                       callback=self._handle_server_started),
-
-            self.rpc.async_add_handler("minecraft:notification/server/stopping",
-                                       callback=self._handle_server_stopping),
-        ]
-        for coro in coro_list:
-            asyncio.create_task(coro)
-
-    def on_connect(self):  # TODO use this somewhere pls
         coro_list = [
             self.get_msmp_player_list(refresh_cache=True),
             self.get_msmp_operator_list(refresh_cache=True),
             self.get_msmp_banned_player_list(refresh_cache=True),
         ]
-        for coro in coro_list:
-            asyncio.create_task(coro)
+        await asyncio.gather(*coro_list)
 
-    def stop(self):
-        self.task.cancel()
+    def _add_handlers(self) -> None:
+        self.rpc.async_add_handler("minecraft:notification/players/joined",
+                                   callback=self._handle_msmp_player_list)
+        self.rpc.async_add_handler("minecraft:notification/players/left",
+                                   callback=self._handle_msmp_player_list)
+
+        self.rpc.async_add_handler("minecraft:notification/operators/added",
+                                   callback=self._handle_msmp_operator_list)
+        self.rpc.async_add_handler("minecraft:notification/operators/removed",
+                                   callback=self._handle_msmp_operator_list)
+
+        self.rpc.async_add_handler("minecraft:notification/bans/added",
+                                   callback=self._handle_msmp_banned_player_list)
+        self.rpc.async_add_handler("minecraft:notification/bans/removed",
+                                   callback=self._handle_msmp_banned_player_list)
+
+        self.rpc.async_add_handler("minecraft:notification/server/saving",
+                                   callback=self._handle_server_saving)
+
+        self.rpc.async_add_handler("minecraft:notification/server/saved",
+                                   callback=self._handle_server_saved)
+
+        self.rpc.async_add_handler("minecraft:notification/server/started",
+                                   callback=self._handle_server_started)
+
+        self.rpc.async_add_handler("minecraft:notification/server/stopping",
+                                   callback=self._handle_server_stopping)
 
     async def _handle_msmp_player_list(self, _):
         await self.get_msmp_player_list(refresh_cache=True)
@@ -125,6 +136,8 @@ class WebSocketMiniverseService:
 
     async def get_msmp_player_list(self, refresh_cache=False) -> list[MSMPPlayer]:
         raw_player_list, has_refreshed = await self._get_data_cached("minecraft:players", refresh_cache)
+        if raw_player_list is None:
+            return []
         if has_refreshed:
             seen_player_dict = (await server_status_store.get(self.miniverse_id, "miniverse:seen_players")) or {}
             seen_player_dict |= {p["id"]: p for p in raw_player_list}
@@ -138,34 +151,42 @@ class WebSocketMiniverseService:
 
     async def get_msmp_operator_list(self, refresh_cache=False) -> list[MSMPOperator]:
         operators, _ = await self._get_data_cached("minecraft:operators", refresh_cache)
+        if operators is None:
+            return []
         return [MSMPOperator(**d) for d in operators]
 
     async def get_msmp_banned_player_list(self, refresh_cache=False) -> list[MSMPPlayerBan]:
         bans, _ = await self._get_data_cached("minecraft:bans", refresh_cache)
+        if bans is None:
+            return []
         return [MSMPPlayerBan(**d) for d in bans]
 
-    async def set_player_operator(self, player_id: str, set_operator: bool):
+    async def set_player_operator(self, player_id: str, set_operator: bool) -> bool:
         if set_operator:
             op = MSMPOperator(permissionLevel=4, bypassesPlayerLimit=True, player=MSMPPlayer(id=player_id, name=""))
-            await self.rpc.async_call_rpc("minecraft:operators/add", [op.model_dump()])
+            result = await self.rpc.async_call_rpc("minecraft:operators/add", [op.model_dump()])
         else:
             player = MSMPPlayer(id=player_id, name="")
-            await self.rpc.async_call_rpc("minecraft:operators/remove", [player.model_dump()])
+            result = await self.rpc.async_call_rpc("minecraft:operators/remove", [player.model_dump()])
+        return result is not None
 
-    async def kick_player(self, player_id: str, reason: str):
+    async def kick_player(self, player_id: str, reason: str) -> bool:
         data = {
             'player': {'id': player_id},
             'message': {'literal': reason}
         }
-        await self.rpc.async_call_rpc("minecraft:players/kick", [data])
+        result = (await self.rpc.async_call_rpc("minecraft:players/kick", [data]))
+        return result is not None
 
-    async def ban_player(self, player_id: str, reason: str):
+    async def ban_player(self, player_id: str, reason: str) -> bool:
         data = {
             'player': {'id': player_id},
             'reason': reason  #
         }
-        await self.rpc.async_call_rpc("minecraft:bans/add", [data])
+        result = (await self.rpc.async_call_rpc("minecraft:bans/add", [data]))
+        return result is not None
 
-    async def unban_player(self, player_id: str):
+    async def unban_player(self, player_id: str) -> bool:
         data = {'id': player_id}
-        await self.rpc.async_call_rpc("minecraft:bans/remove", [data])
+        result = (await self.rpc.async_call_rpc("minecraft:bans/remove", [data]))
+        return result is not None

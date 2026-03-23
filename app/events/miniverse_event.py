@@ -9,7 +9,7 @@ from app.models import MiniverseUserRole
 @dataclass
 class MiniverseEvent:
     type: EventType
-    data: dict | list
+    data: dict | list | None
     miniverse_id: str | None = None
     updated_user_ids: list[str] | None = None
 
@@ -27,7 +27,7 @@ def user_list_from_user_role_list(user_roles: list[MiniverseUserRole]) -> list[s
     return [user_role.user_id for user_role in user_roles]
 
 
-def publish_miniverse_control_event(miniverse_id: str, event_type: EventType, data: dict | list) -> None:
+def publish_miniverse_control_event(miniverse_id: str, event_type: EventType, data: dict | list | None) -> None:
     channels_plugin.publish(MiniverseEvent(
         type=event_type,
         miniverse_id=miniverse_id,

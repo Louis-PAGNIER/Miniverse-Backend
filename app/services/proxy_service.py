@@ -100,16 +100,18 @@ async def update_proxy_config(db: AsyncSession) -> None:
     write_yaml_safe(classic_proxy_config, classic_proxy_config_path)
 
     main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
-    await dockerctl.exec_container(
-        main_container["Id"],
-        ["sh", "-c",
-         "cp /configs/config-main.yml /configs/config-main.yml.tmp && mv /configs/config-main.yml.tmp /configs/config-main.yml"])
+    if main_container is not None:
+        await dockerctl.exec_container(
+            main_container["Id"],
+            ["sh", "-c",
+             "cp /configs/config-main.yml /configs/config-main.yml.tmp && mv /configs/config-main.yml.tmp /configs/config-main.yml"])
 
     classic_container = await dockerctl.get_container_by_name("miniverse-gate-classic")
-    await dockerctl.exec_container(
-        classic_container["Id"],
-        ["sh", "-c",
-         "cp /configs/config-classic.yml /configs/config-classic.yml.tmp && mv /configs/config-classic.yml.tmp /configs/config-classic.yml"])
+    if classic_container is not None:
+        await dockerctl.exec_container(
+            classic_container["Id"],
+            ["sh", "-c",
+             "cp /configs/config-classic.yml /configs/config-classic.yml.tmp && mv /configs/config-classic.yml.tmp /configs/config-classic.yml"])
 
 
 async def start_proxy_containers() -> None:
@@ -137,8 +139,7 @@ async def start_proxy_containers() -> None:
             name="miniverse-gate-classic",
             network_id=settings.DOCKER_NETWORK_NAME,
             volumes={str(classic_proxy_config_path.parent): VolumeConfig(bind="/configs")},
-            # ports={"8080/tcp": 8080}, # Can be enabled to control this service
-            ports={"19132/udp": 19132},
+            ports={"19132/udp": 19132},  # Port for bedrock players
             entrypoint="/usr/local/bin/gate",
             command=["--config", "/configs/config-classic.yml"],
             auto_remove=True,

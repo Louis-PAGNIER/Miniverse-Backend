@@ -29,12 +29,7 @@ dependencies = [
     "aiodocker (>=0.24.0,<0.25.0)",
     "zipstream-new (>=1.1.8,<2.0.0)",
     "python-keycloak (==7.0.2)",
+    "jsonrpc-websocket (==3.2.0)",
+    "aiohttp-socks (==0.11.0)",
+    "pymysql (>=1.1.2,<2.0.0)",
 ]
-
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry]
-package-mode = false

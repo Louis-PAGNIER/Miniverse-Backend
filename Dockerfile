@@ -10,16 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer Poetry
-RUN pip install --no-cache-dir poetry
+# Installer uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Définir le répertoire de travail
 WORKDIR /app
 
-# Copier les fichiers de config poetry
-COPY pyproject.toml poetry.lock poetry.toml* ./
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-root --no-interaction --no-ansi
+# Copier les fichiers de config uv
+COPY pyproject.toml uv.lock* ./
+RUN uv sync --frozen --no-install-project --no-dev
 
 RUN useradd -u 1000 -m -U miniverse
 RUN chown miniverse:miniverse /app
@@ -27,7 +26,11 @@ RUN chown miniverse:miniverse /app
 USER miniverse:miniverse
 
 # Copier ton code
-COPY app ./app
+COPY --chown=miniverse:miniverse app ./app
+
+# Copy alembic files
+COPY --chown=miniverse:miniverse alembic ./alembic
+COPY --chown=miniverse:miniverse alembic.ini ./alembic.ini
 
 # Créer le dossier data (même si sera monté en volume au runtime)
 RUN mkdir -p /app/data

@@ -1,4 +1,3 @@
-import json
 import re
 
 from litestar import get, post, Controller, delete, put
@@ -9,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db_session
 from app.enums import Role
 from app.events.miniverse_event import publish_miniverse_updated_event
-from app.managers.ServerStatusManager import server_status_store
+from app.managers.ServerStatusManager import miniverses_manager
 from app.models import Miniverse, Mod, User, MiniverseUserRole
-from app.schemas import MiniverseCreate, ModUpdateInfo, MiniverseUpdateMCVersion, Player, AutomaticInstallMod, \
-    MSMPPlayerBan
+from app.schemas import MiniverseCreate, ModUpdateInfo, AutomaticInstallMod, \
+    MSMPPlayerBan, MSMPPlayer
 from app.schemas.user import RoleSchema
 from app.services.auth_service import get_current_user
 from app.services.miniverse_service import create_miniverse, get_miniverses, delete_miniverse, get_miniverse, \
@@ -54,7 +53,7 @@ class MiniversesController(Controller):
         await delete_miniverse(miniverse, db)
         return None
 
-    @post("/{miniverse_id:str}/start")
+    @put("/{miniverse_id:str}/start")
     async def start_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.USER:
             raise NotAuthorizedException("You are not authorized to start this miniverse")
@@ -67,7 +66,7 @@ class MiniversesController(Controller):
 
         return miniverse
 
-    @post("/{miniverse_id:str}/stop")
+    @put("/{miniverse_id:str}/stop")
     async def stop_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.USER:
             raise NotAuthorizedException("You are not authorized to stop this miniverse")
@@ -80,7 +79,7 @@ class MiniversesController(Controller):
 
         return miniverse
 
-    @post("/{miniverse_id:str}/restart")
+    @put("/{miniverse_id:str}/restart")
     async def restart_miniverse(self, current_user: User, miniverse_id: str, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.USER:
             raise NotAuthorizedException("You are not authorized to restart this miniverse")
@@ -93,9 +92,8 @@ class MiniversesController(Controller):
 
         return miniverse
 
-    @post("/{miniverse_id:str}/update_mc_version")
-    async def update_miniverse(self, current_user: User, miniverse_id: str, data: MiniverseUpdateMCVersion,
-                               db: AsyncSession) -> Miniverse:
+    @put("/{miniverse_id:str}")
+    async def update_miniverse(self, current_user: User, miniverse_id: str, data: dict, db: AsyncSession) -> Miniverse:
         if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
             raise NotAuthorizedException("You are not authorized to update this miniverse")
 
@@ -103,7 +101,7 @@ class MiniversesController(Controller):
         if miniverse is None:
             raise NotFoundException("Miniverse not found")
 
-        return await update_miniverse(miniverse, data.mc_version, db)
+        return await update_miniverse(miniverse, data, db)
 
     @post("/{miniverse_id:str}/install/mod")
     async def automatic_install_mod(self, current_user: User, miniverse_id: str, data: AutomaticInstallMod,
@@ -167,7 +165,8 @@ class MiniversesController(Controller):
         return users
 
     @put("/{miniverse_id:str}/roles/{user_id_or_name:str}")
-    async def set_user_role(self, current_user: User, miniverse_id: str, user_id_or_name: str, data: RoleSchema, db: AsyncSession) -> None:
+    async def set_user_role(self, current_user: User, miniverse_id: str, user_id_or_name: str, data: RoleSchema,
+                            db: AsyncSession) -> None:
         if current_user.get_miniverse_role(miniverse_id) < Role.ADMIN:
             raise NotAuthorizedException("You are not authorized to list users of this miniverse")
 
@@ -198,23 +197,19 @@ class MiniversesController(Controller):
         await db.commit()
         publish_miniverse_updated_event(miniverse_id, [user.id])
 
-
     @get("/players")
-    async def list_all_players(self, current_user: User, db: AsyncSession) -> dict[str, list[Player]]:
+    async def list_all_players(self, current_user: User, db: AsyncSession) -> dict[str, list[MSMPPlayer]]:
         miniverses = await get_miniverses(db)
         miniverses = [m for m in miniverses if current_user.get_miniverse_role(m.id) >= Role.USER]
 
-        result: dict[str, list[Player]] = {}
+        result: dict[str, list[MSMPPlayer]] = {}
         for miniverse in miniverses:
             if not miniverse.started:
                 result[miniverse.id] = []
                 continue
 
-            json_raw = await server_status_store.get(f"{miniverse.id}.players")
-            if json_raw is None:
-                result[miniverse.id] = []
-            else:
-                result[miniverse.id] = json.loads(json_raw)
+            result[miniverse.id] = await miniverses_manager.get_miniverse_controller(
+                miniverse.id).get_msmp_player_list()
 
         return result
 
@@ -229,11 +224,8 @@ class MiniversesController(Controller):
                 result[miniverse.id] = []
                 continue
 
-            json_raw = await server_status_store.get(f"{miniverse.id}.bans")
-            if json_raw is None:
-                result[miniverse.id] = []
-            else:
-                result[miniverse.id] = json.loads(json_raw)
+            result[miniverse.id] = await miniverses_manager.get_miniverse_controller(
+                miniverse.id).get_msmp_banned_player_list()
 
         return result
 
@@ -244,7 +236,9 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to set operators in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_set_player_operator(miniverse, player_id, value)
+        result = await miniverse_set_player_operator(miniverse, player_id, value)
+        if not result:
+            raise NotFoundException("Cannot set operator")
 
     @post("/{miniverse_id:str}/kick")
     async def kick_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
@@ -253,7 +247,9 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to kick players in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_kick_player(miniverse, player_id, reason)
+        result = await miniverse_kick_player(miniverse, player_id, reason)
+        if not result:
+            raise NotFoundException("Cannot kick player")
 
     @post("/{miniverse_id:str}/ban")
     async def ban_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession,
@@ -262,7 +258,9 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to ban players in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_ban_player(miniverse, player_id, reason)
+        result = await miniverse_ban_player(miniverse, player_id, reason)
+        if not result:
+            raise NotFoundException("Cannot ban player")
 
     @post("/{miniverse_id:str}/unban")
     async def unban_player(self, current_user: User, miniverse_id: str, player_id: str, db: AsyncSession) -> None:
@@ -270,4 +268,6 @@ class MiniversesController(Controller):
             raise NotAuthorizedException("You are not authorized to unban players in this miniverse")
 
         miniverse = await get_miniverse(miniverse_id, db)
-        await miniverse_unban_player(miniverse, player_id)
+        result = await miniverse_unban_player(miniverse, player_id)
+        if not result:
+            raise NotFoundException("Cannot pardon player")

@@ -22,7 +22,7 @@ class Mod(Base):
     version_number: Mapped[str | None] = mapped_column(String(settings.DATABASE_DEFAULT_STRING_LENGTH))
     file_name: Mapped[str] = mapped_column(String(settings.DATABASE_DEFAULT_STRING_LENGTH), info=dto_field("private"))
 
-    miniverse_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("miniverses.id"),
+    miniverse_id: Mapped[str] = mapped_column(String(36), ForeignKey("miniverses.id"),
                                                      info=dto_field("read-only"),
                                                      nullable=False)
     miniverse = relationship("Miniverse", back_populates="mods", lazy="selectin", info=dto_field("private"))

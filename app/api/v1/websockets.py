@@ -11,12 +11,15 @@ from websockets import ConnectionClosedError
 from app import get_db_session, logger
 from app.core import settings
 from app.enums import Role
-from app.enums.event_type import EventType
 from app.events.miniverse_event import MiniverseEvent
+from app.managers import miniverses_manager
 from app.models import User
+from app.schemas import MiniverseSchema
+from app.schemas.events import SyncEventItem, SyncEvent
 from app.services.docker_service import dockerctl
-from app.services.miniverse_service import get_miniverse
+from app.services.miniverse_service import get_miniverse, get_miniverses
 from app.services.user_service import get_user
+from app.services.websocket_miniverse_service import WebSocketMiniverseService
 
 
 @dataclass
@@ -42,10 +45,38 @@ async def handle_miniverse_channel_message(message: bytes,
         await socket.send_json(event)
 
 
+async def send_init_data(socket: WebSocket, ctx: WebsocketContext, db: AsyncSession):
+    miniverses = await get_miniverses(db)
+    miniverses = [m for m in miniverses if ctx.user.get_miniverse_role(m.id) >= Role.USER]
+
+    data = []
+    for miniverse in miniverses:
+        controller: WebSocketMiniverseService | None = miniverses_manager.get_miniverse_controller(miniverse.id)
+        assert controller is not None
+
+        players, seen_players, operators, banned_players = await asyncio.gather(
+            controller.get_msmp_player_list(),
+            controller.get_msmp_seen_player_list(),
+            controller.get_msmp_operator_list(),
+            controller.get_msmp_banned_player_list(),
+        )
+        data.append(SyncEventItem(
+            miniverse=MiniverseSchema.model_validate(miniverse),
+            players=players,
+            seen_players=seen_players,
+            operators=operators,
+            banned_players=banned_players,
+        ))
+
+    await socket.send_json(SyncEvent(data=data).model_dump())
+
+
 @websocket("/ws/miniverse", dependencies={"db": Provide(get_db_session)})
-async def websocket_miniverse_updates_handler(socket: WebSocket, channels: ChannelsPlugin, db: AsyncSession) -> None:
+async def websocket_miniverse_updates_handler(socket: WebSocket, channels: ChannelsPlugin,
+                                              db: AsyncSession) -> None:
     await socket.accept()
     ctx = WebsocketContext(await get_user(socket.user.id, db))
+    await send_init_data(socket, ctx, db)
     try:
         async with channels.start_subscription(
                 [settings.REDIS_CHANNEL_NAME]) as subscriber, subscriber.run_in_background(
@@ -65,6 +96,7 @@ async def websocket_miniverse_logs_handler(miniverse_id: str, socket: WebSocket,
     await socket.accept()
     miniverse = await get_miniverse(miniverse_id, db)
     user = await get_user(socket.user.id, db)
+
     # if user.get_miniverse_role(miniverse_id) >= Role.MODERATOR:
 
     async def log_streamer():

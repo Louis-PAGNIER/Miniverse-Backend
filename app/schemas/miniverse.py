@@ -25,6 +25,7 @@ class MiniverseCreate(BaseModel):
     name: str
     type: MiniverseType
     description: str | None
+    java_version: str | None
     mc_version: str
     subdomain: str | None
     is_on_lite_proxy: bool

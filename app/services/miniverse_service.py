@@ -45,6 +45,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
         name=miniverse.name,
         type=miniverse.type,
         description=miniverse.description,
+        java_version=miniverse.java_version,
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
         is_on_lite_proxy=miniverse.is_on_lite_proxy,
@@ -104,7 +105,7 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
     host_volume_data_path = get_miniverse_path(miniverse.id, "data", from_host=True)
 
     container = await dockerctl.create_container(
-        image="itzg/minecraft-server",
+        image=f"itzg/minecraft-server:{miniverse.java_version if miniverse.java_version else "latest"}",
         name=container_name,
         network_id=settings.DOCKER_NETWORK_NAME,
         volumes={str(host_volume_data_path): VolumeConfig(bind="/data")},
@@ -228,7 +229,7 @@ async def list_miniverse_users(miniverse: Miniverse) -> list[User]:
 
 
 async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -> Miniverse:
-    fields_to_update = ["name", "description", "subdomain", "allow_bedrock"]
+    fields_to_update = ["name", "description", "subdomain", "java_version", "allow_bedrock"]
     changed_fields = set()
     has_changed = False
 

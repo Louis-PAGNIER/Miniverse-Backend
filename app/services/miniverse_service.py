@@ -69,9 +69,9 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
     volume_data_path.mkdir(parents=True, exist_ok=True)
     await init_data_path(db_miniverse, db)
 
+    miniverses_manager.add_miniverse(db_miniverse)
     await start_miniverse(db_miniverse, db)
     await update_proxy_config(db)
-    miniverses_manager.add_miniverse(miniverse)
 
     publish_miniverse_created_event(db_miniverse.id, user_list_from_user_role_list(db_miniverse.users_roles))
 

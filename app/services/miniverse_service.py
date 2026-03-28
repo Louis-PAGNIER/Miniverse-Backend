@@ -116,6 +116,7 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
             "MOTD": f"Welcome to {miniverse.name}!",
             "ONLINE_MODE": "TRUE" if miniverse.is_on_lite_proxy else "FALSE",
             "SERVER_PORT": "25565",
+            "MAX_MEMORY": "90%",
             "MANAGEMENT_SERVER_ENABLED": "TRUE",
             "MANAGEMENT_SERVER_TLS_ENABLED": "FALSE",
             "MANAGEMENT_SERVER_HOST": "0.0.0.0",

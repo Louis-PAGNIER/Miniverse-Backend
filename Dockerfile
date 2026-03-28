@@ -39,4 +39,4 @@ RUN mkdir -p /app/data
 EXPOSE 8000
 
 # Lancer ton serveur (adapté si tu utilises Litestar avec uvicorn)
-CMD ["litestar", "--app", "app.main:app", "run", "--debug", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "litestar", "--app", "app.main:app", "run", "--debug", "--host", "0.0.0.0", "--port", "8000"]

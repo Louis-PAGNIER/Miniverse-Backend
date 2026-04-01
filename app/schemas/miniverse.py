@@ -2,13 +2,19 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from app.enums import MiniverseType
+from app.enums import MiniverseType, Role
 from app.schemas.mods import ModSchema
+
+
+class MiniverseUserRoleSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    miniverse_id: str
+    user_id: str
+    role: Role
 
 
 class MiniverseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     name: str
     type: MiniverseType
@@ -19,6 +25,7 @@ class MiniverseSchema(BaseModel):
     allow_bedrock: bool
     started: bool
     mods: list[ModSchema]
+    users_roles: list[MiniverseUserRoleSchema]
 
 
 class MiniverseCreate(BaseModel):

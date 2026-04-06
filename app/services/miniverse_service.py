@@ -48,7 +48,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
         java_version=miniverse.java_version,
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
-        is_on_lite_proxy=miniverse.is_on_lite_proxy,
+        is_on_lite_proxy=True, #TODO: Add back this option with velocity proxy: miniverse.is_on_lite_proxy
         management_server_secret=generate_random_string(40),
     )
     db.add(db_miniverse)

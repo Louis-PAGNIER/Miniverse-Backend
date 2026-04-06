@@ -124,6 +124,16 @@ class AsyncDockerController:
 
         return await asyncio.to_thread(_remove)
 
+    async def kill_container(self, container_id: str, signal: str | int = "SIGKILL"):
+        def _kill():
+            try:
+                container = self.client.containers.get(container_id)
+                container.kill(signal=signal)
+            except docker.errors.NotFound:
+                pass
+
+        return await asyncio.to_thread(_kill)
+
     async def get_container(self, container_id: str) -> dict[str, Any]:
         def _get():
             try:

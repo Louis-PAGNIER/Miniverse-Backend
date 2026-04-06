@@ -1,157 +1,58 @@
+import json
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.utils import write_yaml_safe
 from app.models import Miniverse
 from app.services.docker_service import dockerctl, VolumeConfig
 
 
-def generate_main_proxy_config(miniverse_list: list[Miniverse]) -> dict:
+def generate_router_routes(miniverse_list: list[Miniverse]) -> dict:
     return {
-        "config": {
-            "bind": "0.0.0.0:25565",
-            "lite": {
-                "enabled": True,
-                "routes": [
-                              {
-                                  "host": f"{miniverse.subdomain}.{settings.DOMAIN_NAME}",
-                                  # TODO create env vars for domain name
-                                  "backend": f"miniverse-{miniverse.id}:25565",
-                                  "cachePingTTL": "-1s",
-                                  "fallback": {
-                                      "motd": f"§c{miniverse.name} server is offline",
-                                      "version": {
-                                          "name": "§cTry again later!",
-                                          "protocol": -1
-                                      }
-                                  }
-                              }
-                              for miniverse in miniverse_list] + [
-                              {
-                                  "host": "*",
-                                  "backend": "miniverse-gate-classic:25565",
-                                  "cachePingTTL": "-1s",
-                                  "fallback": {
-                                      "motd": "§cThe Gate classic proxy is offline",
-                                      "version": {
-                                          "name": "§cContact an administrator",
-                                          "protocol": -1
-                                      }
-                                  }
-                              }
-                          ]
-            }
+        "mappings": {
+            f"{m.subdomain}.{settings.DOMAIN_NAME}": f"miniverse-{m.id}:25565"
+            for m in miniverse_list
         }
     }
-
-
-def generate_classic_proxy_config(miniverse_list: list[Miniverse]) -> dict:
-    return {
-        "config": {
-            "bind": "0.0.0.0:25565",
-            "onlineMode": True,
-            "servers": {
-                miniverse.id: f"miniverse-{miniverse.id}:25565" for miniverse in miniverse_list
-            },
-            "try": [miniverse.id for miniverse in miniverse_list],
-            "forcedHosts": {
-                f"{miniverse.subdomain}.{settings.DOMAIN_NAME}": [miniverse.id] for miniverse in miniverse_list
-            },
-            "forwarding": {
-                "mode": "velocity",
-                "velocitySecret": settings.PROXY_SECRET,
-            },
-            "status": {
-                "motd": "§bA Miniverse Server",
-                "showMaxPlayers": 1000,
-            },
-            "acceptTransfers": True,
-            "bedrock": {
-                "enabled": True,
-                "managed": {
-                    "enabled": True,
-                    "autoUpdate": True,
-                },
-            }
-        },
-        # "api": {
-        #     "enabled": True, # Can be enabled to control this service
-        #     "bind": "0.0.0.0:8080"
-        # }
-    }
-
 
 async def update_proxy_config(db: AsyncSession) -> None:
     miniverses = await db.execute(select(Miniverse))
     miniverse_list = list(miniverses.scalars().all())
 
-    main_proxy_config = generate_main_proxy_config(
-        [miniverse for miniverse in miniverse_list if miniverse.is_on_lite_proxy])
-    main_proxy_config_path = settings.DATA_PATH / "proxy" / "configs" / "config-main.yml"
+    routes_data = generate_router_routes(miniverse_list)
+    routes_path = settings.DATA_PATH / "proxy" / "routes.json"
+    routes_path.parent.mkdir(parents=True, exist_ok=True)
 
-    classic_proxy_config = generate_classic_proxy_config(
-        [miniverse for miniverse in miniverse_list if not miniverse.is_on_lite_proxy])
-    classic_proxy_config_path = settings.DATA_PATH / "proxy" / "configs" / "config-classic.yml"
+    with open(routes_path, "w") as f:
+        json.dump(routes_data, f, indent=4)
 
-    main_proxy_config_path.parent.mkdir(parents=True, exist_ok=True)
-
-    write_yaml_safe(main_proxy_config, main_proxy_config_path)
-    write_yaml_safe(classic_proxy_config, classic_proxy_config_path)
-
-    main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
-    if main_container is not None:
-        await dockerctl.exec_container(
-            main_container["Id"],
-            ["sh", "-c",
-             "cp -p /configs/config-main.yml /configs/config-main.yml.tmp && mv /configs/config-main.yml.tmp /configs/config-main.yml"])
-
-    classic_container = await dockerctl.get_container_by_name("miniverse-gate-classic")
-    if classic_container is not None:
-        await dockerctl.exec_container(
-            classic_container["Id"],
-            ["sh", "-c",
-             "cp -p /configs/config-classic.yml /configs/config-classic.yml.tmp && mv /configs/config-classic.yml.tmp /configs/config-classic.yml"])
+    router_container = await dockerctl.get_container_by_name("miniverse-router")
+    if router_container:
+        await dockerctl.kill_container(router_container["Id"], signal="SIGHUP")
 
 
 async def start_proxy_containers() -> None:
-    main_proxy_config_path = settings.HOST_DATA_PATH / "proxy" / "configs" / "config-main.yml"
-    classic_proxy_config_path = settings.HOST_DATA_PATH / "proxy" / "configs" / "config-classic.yml"
+    host_routes_dir = settings.HOST_DATA_PATH / "proxy"
 
-    main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
-    if main_container is None:
-        main_container = await dockerctl.create_container(
-            image="ghcr.io/minekube/gate/jre:latest",
-            name="miniverse-gate-main",
+    router_container = await dockerctl.get_container_by_name("miniverse-router")
+
+    if router_container is None:
+        await dockerctl.create_container(
+            image="itzg/mc-router:latest",
+            name="miniverse-router",
             network_id=settings.DOCKER_NETWORK_NAME,
-            volumes={str(main_proxy_config_path.parent): VolumeConfig(bind="/configs")},
+            volumes={str(host_routes_dir): VolumeConfig(bind="/config", mode="ro")},
             ports={"25565/tcp": 25565},
-            entrypoint="/usr/local/bin/gate",
-            command=["--config", "/configs/config-main.yml"],
+            command=[
+                "--routes-config", "/config/routes.json", "--routes-config-watch", "--connection-rate-limit", "10"
+            ],
             auto_remove=True,
         )
-        await dockerctl.start_container(main_container["Id"])
-
-    classic_container = await dockerctl.get_container_by_name("miniverse-gate-classic")
-    if classic_container is None:
-        classic_container = await dockerctl.create_container(
-            image="ghcr.io/minekube/gate/jre:latest",
-            name="miniverse-gate-classic",
-            network_id=settings.DOCKER_NETWORK_NAME,
-            volumes={str(classic_proxy_config_path.parent): VolumeConfig(bind="/configs")},
-            ports={"19132/udp": 19132},  # Port for bedrock players
-            entrypoint="/usr/local/bin/gate",
-            command=["--config", "/configs/config-classic.yml"],
-            auto_remove=True,
-        )
-        await dockerctl.start_container(classic_container["Id"])
+        await dockerctl.start_container("miniverse-router")
 
 
 async def stop_proxy_containers() -> None:
-    main_container = await dockerctl.get_container_by_name("miniverse-gate-main")
-    if main_container:
-        await dockerctl.stop_container(main_container["Id"])
-
-    classic_container = await dockerctl.get_container_by_name("miniverse-gate-classic")
-    if classic_container:
-        await dockerctl.stop_container(classic_container["Id"])
+    proxy_container = await dockerctl.get_container_by_name("miniverse-router")
+    if proxy_container:
+        await dockerctl.stop_container(proxy_container["Id"])

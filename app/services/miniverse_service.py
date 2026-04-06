@@ -1,4 +1,5 @@
 import shutil
+from importlib import resources
 from pathlib import Path
 
 import toml
@@ -67,7 +68,6 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
 
     volume_data_path = get_miniverse_path(db_miniverse.id, "data")
     volume_data_path.mkdir(parents=True, exist_ok=True)
-    await init_data_path(db_miniverse, db)
 
     miniverses_manager.add_miniverse(db_miniverse)
     await start_miniverse(db_miniverse, db)
@@ -145,6 +145,11 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
 
     prioritize_release = parsed_game_version == 'release'
 
+    icon_path = volume_data_path / "server-icon.png"
+    if not icon_path.exists():
+        with resources.path("app.assets", "miniverse-64.png") as p:
+            shutil.copyfile(p, icon_path)
+
     if not miniverse.is_on_lite_proxy:
         config_path = volume_data_path / "config"
         config_path.mkdir(parents=True, exist_ok=True)
@@ -167,6 +172,8 @@ async def init_data_path(miniverse: Miniverse, db: AsyncSession):
 
 
 async def start_miniverse(miniverse: Miniverse, db: AsyncSession) -> dict:
+    await init_data_path(miniverse, db)
+
     miniverse.started = True
     await db.commit()
     await db.refresh(miniverse)

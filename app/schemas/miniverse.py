@@ -19,8 +19,10 @@ class MiniverseSchema(BaseModel):
     name: str
     type: MiniverseType
     description: Optional[str] = None
+    java_version: str | None
     mc_version: str
     subdomain: str
+    online_mode: bool
     is_on_lite_proxy: bool
     allow_bedrock: bool
     started: bool
@@ -35,6 +37,7 @@ class MiniverseCreate(BaseModel):
     java_version: str | None
     mc_version: str
     subdomain: str | None
+    online_mode: bool
     is_on_lite_proxy: bool
 
 

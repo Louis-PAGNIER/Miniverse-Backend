@@ -23,6 +23,7 @@ class Miniverse(Base):
     java_version: Mapped[JavaVersion | None] = mapped_column(String(64), info=dto_field("read-only"))
     mc_version: Mapped[str] = mapped_column(String(64), info=dto_field("read-only"))
     subdomain: Mapped[str] = mapped_column(String(settings.DATABASE_DEFAULT_STRING_LENGTH), info=dto_field("read-only"))
+    online_mode: Mapped[bool] = mapped_column(Boolean, info=dto_field("read-only"))
     is_on_lite_proxy: Mapped[bool] = mapped_column(Boolean, info=dto_field("read-only"))
     allow_bedrock: Mapped[bool] = mapped_column(Boolean, default=False)
     started: Mapped[bool] = mapped_column(Boolean, default=False, info=dto_field("read-only"))

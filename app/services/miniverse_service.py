@@ -49,6 +49,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
         java_version=miniverse.java_version,
         mc_version=miniverse.mc_version,
         subdomain=miniverse.subdomain,
+        online_mode=miniverse.online_mode,
         is_on_lite_proxy=True, #TODO: Add back this option with velocity proxy: miniverse.is_on_lite_proxy
         management_server_secret=generate_random_string(40),
     )
@@ -114,7 +115,7 @@ async def create_miniverse_container(miniverse: Miniverse, db: AsyncSession) -> 
             "TYPE": miniverse.type.value.upper(),
             "VERSION": miniverse.mc_version,
             "MOTD": f"Welcome to {miniverse.name}!",
-            "ONLINE_MODE": "TRUE" if miniverse.is_on_lite_proxy else "FALSE",
+            "ONLINE_MODE": "TRUE" if miniverse.is_on_lite_proxy and miniverse.online_mode else "FALSE",
             "SERVER_PORT": "25565",
             "MAX_MEMORY": "90%",
             "MANAGEMENT_SERVER_ENABLED": "TRUE",
@@ -237,9 +238,10 @@ async def list_miniverse_users(miniverse: Miniverse) -> list[User]:
 
 
 async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -> Miniverse:
-    fields_to_update = ["name", "description", "subdomain", "java_version", "allow_bedrock"]
+    fields_to_update = ["name", "description", "subdomain", "java_version", "allow_bedrock", "online_mode"]
     changed_fields = set()
     has_changed = False
+    should_restart = False
 
     for field in fields_to_update:
         new_value = data.get(field)
@@ -256,16 +258,22 @@ async def update_miniverse(miniverse: Miniverse, data: dict, db: AsyncSession) -
             has_changed = True
             changed_fields.add(field)
 
-    new_version = data.get("mc_version")
-    version_changed = new_version is not None and miniverse.mc_version != new_version
+    game_version = data.get("mc_version")
+    version_changed = game_version is not None and miniverse.mc_version != game_version
+
+    java_version = data.get("java_version")
+    should_restart = should_restart or (java_version is not None and miniverse.java_version != java_version)
 
     if has_changed:
         await db.commit()
         await db.refresh(miniverse)
 
     if version_changed:
-        miniverse = await update_miniverse_game_version(miniverse, new_version, db)
+        miniverse = await update_miniverse_game_version(miniverse, game_version, db)
         has_changed = True
+
+    if should_restart:
+        await restart_miniverse(miniverse, db)
 
     if len(changed_fields.intersection({'subdomain', 'allow_bedrock'})) > 0:
         await update_proxy_config(db)

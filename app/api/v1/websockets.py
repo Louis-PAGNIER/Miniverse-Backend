@@ -16,10 +16,12 @@ from app.managers import miniverses_manager
 from app.models import User
 from app.schemas import MiniverseSchema
 from app.schemas.events import SyncEventItem, SyncEvent
+from app.services.connexion.BaseMiniverseService import BaseMiniverseService
+from app.services.connexion.MCRouterMiniverseService import MCRouterMiniverseService
+from app.services.connexion.WebSocketMiniverseService import WebSocketMiniverseService
 from app.services.docker_service import dockerctl
 from app.services.miniverse_service import get_miniverse, get_miniverses
 from app.services.user_service import get_user
-from app.services.websocket_miniverse_service import WebSocketMiniverseService
 
 
 @dataclass
@@ -51,22 +53,37 @@ async def send_init_data(socket: WebSocket, ctx: WebsocketContext, db: AsyncSess
 
     data = []
     for miniverse in miniverses:
-        controller: WebSocketMiniverseService | None = miniverses_manager.get_miniverse_controller(miniverse.id)
+        controller: BaseMiniverseService | None = miniverses_manager.get_miniverse_controller(miniverse.id)
         assert controller is not None
 
-        players, seen_players, operators, banned_players = await asyncio.gather(
-            controller.get_msmp_player_list(),
-            controller.get_msmp_seen_player_list(),
-            controller.get_msmp_operator_list(),
-            controller.get_msmp_banned_player_list(),
-        )
-        data.append(SyncEventItem(
-            miniverse=MiniverseSchema.model_validate(miniverse),
-            players=players,
-            seen_players=seen_players,
-            operators=operators,
-            banned_players=banned_players,
-        ))
+        if isinstance(controller, WebSocketMiniverseService):
+            players, seen_players, operators, banned_players = await asyncio.gather(
+                controller.get_msmp_player_list(),
+                controller.get_msmp_seen_player_list(),
+                controller.get_msmp_operator_list(),
+                controller.get_msmp_banned_player_list(),
+            )
+            data.append(SyncEventItem(
+                miniverse=MiniverseSchema.model_validate(miniverse),
+                players=players,
+                seen_players=seen_players,
+                operators=operators,
+                banned_players=banned_players,
+            ))
+        elif isinstance(controller, MCRouterMiniverseService):
+            players, seen_players = await asyncio.gather(
+                controller.get_msmp_player_list(),
+                controller.get_msmp_seen_player_list(),
+            )
+            data.append(SyncEventItem(
+                miniverse=MiniverseSchema.model_validate(miniverse),
+                players=players,
+                seen_players=seen_players,
+                operators=[],
+                banned_players=[],
+            ))
+        else:
+            raise NotImplementedError(f"Unknown controller type: {type(controller)}")
 
     await socket.send_json(SyncEvent(data=data).model_dump())
 

@@ -22,7 +22,7 @@ from app.services.docker_service import dockerctl, VolumeConfig
 from app.services.minecraft_service import parse_version, compare_versions
 from app.services.mods_service import automatic_mod_install, list_possible_mod_updates, update_mod
 from app.services.proxy_service import update_proxy_config
-from app.services.websocket_miniverse_service import server_status_store
+from app.services.connexion.server_status_store import server_status_store
 
 
 def get_miniverse_path(miniverse_id: str, *subpaths: str, from_host: bool = False) -> Path:
@@ -70,7 +70,7 @@ async def create_miniverse(miniverse: MiniverseCreate, creator: User, db: AsyncS
     volume_data_path = get_miniverse_path(db_miniverse.id, "data")
     volume_data_path.mkdir(parents=True, exist_ok=True)
 
-    miniverses_manager.add_miniverse(db_miniverse)
+    await miniverses_manager.add_miniverse(db_miniverse)
     await start_miniverse(db_miniverse, db)
     await update_proxy_config(db)
 

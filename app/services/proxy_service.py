@@ -38,6 +38,10 @@ async def start_proxy_containers() -> None:
     router_container = await dockerctl.get_container_by_name("miniverse-router")
 
     if router_container is None:
+        webhook_url = "http://miniverse-api:8000/api-internal/mc-router" if settings.PROXY_SOCKS is None else "http://host.docker.internal:8000/api-internal/mc-router"
+        # TODO: restrict websocket + mc-router network access, so miniverses cannot control others
+        # TODO: restart the container if previously it was not started with the same settings
+
         await dockerctl.create_container(
             image="itzg/mc-router:latest",
             name="miniverse-router",
@@ -45,7 +49,7 @@ async def start_proxy_containers() -> None:
             volumes={str(host_routes_dir): VolumeConfig(bind="/config", mode="ro")},
             ports={"25565/tcp": 25565},
             command=[
-                "--routes-config", "/config/routes.json", "--routes-config-watch", "--connection-rate-limit", "10"
+                "--routes-config", "/config/routes.json", "--routes-config-watch", "--connection-rate-limit", "10", "--webhook-url", webhook_url, "--webhook-require-user"
             ],
             auto_remove=True,
         )

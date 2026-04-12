@@ -1,56 +1,19 @@
 import asyncio
-import json
-
-from litestar.stores.redis import RedisStore
 
 from app import logger
-from app.core import root_store
-from app.enums.event_type import EventType
-from app.events.miniverse_event import publish_miniverse_control_event
-from app.schemas import MSMPOperator, MSMPPlayerBan, MSMPPlayer
+from app.schemas import MSMPPlayer, MSMPOperator, MSMPPlayerBan
+from app.services.connexion.BaseMiniverseService import BaseMiniverseService
 from app.services.rpc_service import RpcService
 
 
-class ServerStatusStore:
-    def __init__(self, redis_store: RedisStore):
-        self.redis_store = redis_store
-
-    async def set(self, miniverse_id: str, method_name: str, value: dict | list | None, publish=True) -> None:
-        key = f"{miniverse_id}.{method_name}"
-        old_json_value = await self.redis_store.get(key)
-
-        if value is not None:
-            json_value = json.dumps(value)
-        else:
-            json_value = None
-
-        if old_json_value != json_value:
-            if json_value is not None:
-                await self.redis_store.set(key, json_value)
-            else:
-                await self.redis_store.delete(key)
-            if publish:
-                publish_miniverse_control_event(miniverse_id, EventType(method_name), value)
-
-    async def get(self, miniverse_id: str, method_id: str) -> dict | list | None:
-        str_data = await self.redis_store.get(f"{miniverse_id}.{method_id}")
-        if str_data is None:
-            return None
-        return json.loads(str_data)
-
-    async def delete_miniverse_cache(self, miniverse_id: str):
-        async for r in self.redis_store._redis.scan_iter(f"{miniverse_id}.*"):
-            await self.redis_store.delete(r)
-
-
-server_status_store = ServerStatusStore(root_store.with_namespace("server-status"))
-
-
-class WebSocketMiniverseService:
+class WebSocketMiniverseService(BaseMiniverseService):
     def __init__(self, miniverse_id: str, url: str, secret: str):
-        self.miniverse_id = miniverse_id
-        self.rpc: RpcService = RpcService(url, secret)
+        super().__init__(miniverse_id)
+        self.rpc = RpcService(url, secret)
         self.task = None
+
+    async def _get_data_from_source(self, method_name: str):
+        return await self.rpc.async_call_rpc(method_name)
 
     def start(self):
         if self.task is None:
@@ -125,33 +88,6 @@ class WebSocketMiniverseService:
 
     def _handle_server_stopping(self):
         logger.info(f"Miniverse {self.miniverse_id} is stopping...")
-
-    async def _get_data_cached(self, method_name: str, refresh_cache: bool):
-        if not refresh_cache:
-            raw_data = await server_status_store.get(self.miniverse_id, method_name)
-        else:
-            raw_data = None
-        has_refreshed = False
-        if raw_data is None:
-            raw_data = await self.rpc.async_call_rpc(method_name)
-            await server_status_store.set(self.miniverse_id, method_name, raw_data)
-            has_refreshed = True
-        return raw_data, has_refreshed
-
-    async def get_msmp_player_list(self, refresh_cache=False) -> list[MSMPPlayer]:
-        raw_player_list, has_refreshed = await self._get_data_cached("minecraft:players", refresh_cache)
-        if raw_player_list is None:
-            return []
-        if has_refreshed:
-            seen_player_dict = (await server_status_store.get(self.miniverse_id, "miniverse:seen_players")) or {}
-            seen_player_dict |= {p["id"]: p for p in raw_player_list}
-            await server_status_store.set(self.miniverse_id, "miniverse:seen_players", seen_player_dict, publish=False)
-
-        return [MSMPPlayer(**d) for d in raw_player_list]
-
-    async def get_msmp_seen_player_list(self) -> list[MSMPPlayer]:
-        seen_player_dict = (await server_status_store.get(self.miniverse_id, "miniverse:seen_players")) or {}
-        return [MSMPPlayer(**p) for p in seen_player_dict.values()]
 
     async def get_msmp_operator_list(self, refresh_cache=False) -> list[MSMPOperator]:
         operators, _ = await self._get_data_cached("minecraft:operators", refresh_cache)

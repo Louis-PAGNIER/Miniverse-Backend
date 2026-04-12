@@ -10,6 +10,7 @@ from litestar.openapi.plugins import SwaggerRenderPlugin
 from litestar.types import HTTPScope
 
 from app import logger
+from app.api.internal.mcrouter import MCRouterController
 from app.api.v1 import UsersController, MiniversesController, ModsController
 from app.api.v1.files import FilesController
 from app.api.v1.minecraft import MinecraftController
@@ -33,7 +34,7 @@ async def miniverse_controller_manager_startup():
     async with session_config.get_session() as session:
         miniverses = await get_miniverses(session)
         for miniverse in miniverses:
-            control = miniverses_manager.add_miniverse(miniverse)
+            control = await miniverses_manager.add_miniverse(miniverse)
             if miniverse.started:
                 control.start()
 
@@ -76,7 +77,7 @@ app = Litestar(
     cors_config=cors_config,
     response_cache_config=response_cache_config,
     route_handlers=[UsersController, SelfUserController, MiniversesController, FilesController, ModsController,
-                    MinecraftController,
+                    MinecraftController, MCRouterController,
                     websocket_miniverse_updates_handler, websocket_miniverse_logs_handler],
     on_startup=[proxy_startup, miniverse_controller_manager_startup, docker_startup],
     on_shutdown=[],

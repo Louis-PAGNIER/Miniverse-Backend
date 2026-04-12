@@ -1,8 +1,13 @@
 from pathlib import Path
+from typing import Annotated, Any
 
 from litestar import Controller, get, post, Response, MediaType
+from litestar.datastructures import UploadFile
 from litestar.di import Provide
+from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotAuthorizedException, NotFoundException
+from litestar.params import Body
+from litestar.response import File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import get_db_session
@@ -13,7 +18,7 @@ from app.schemas.fileinfo import FileInfo, FilesRequest, RenameFileRequest, Hook
 from app.services.auth_service import get_current_user
 from app.services.files_service import list_miniverse_files, delete_miniverse_files, copy_miniverse_files, \
     transform_safe_miniverse_files, download_files, upload_miniverse_file, extract_miniverse_archive, rename_file, \
-    compress_miniverse_files
+    compress_miniverse_files, get_file_content, set_file_content
 from app.services.miniverse_service import get_miniverse
 
 
@@ -27,7 +32,7 @@ class FilesController(Controller):
 
     @get("/{miniverse_id:str}")
     async def list_miniverse_files(self, current_user: User, miniverse_id: str, db: AsyncSession,
-                                   path: Path = Path("/")) -> list[FileInfo]:
+                                   path: Path = Path("/")) -> list[FileInfo] | None:
         if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
             raise NotAuthorizedException("You are not authorized to view files in this miniverse")
 
@@ -171,3 +176,25 @@ class FilesController(Controller):
         miniverse = await get_miniverse(miniverse_id, db)
 
         rename_file(miniverse, data.path, data.new_name)
+
+    @get("/{miniverse_id:str}/content")
+    async def get_file_content(self, current_user: User, miniverse_id: str, path: Path, db: AsyncSession) -> File:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to read files in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        return get_file_content(miniverse, path)
+
+    @post("/{miniverse_id:str}/content")
+    async def set_file_content(self, current_user: User, miniverse_id: str, path: Path, db: AsyncSession,
+                               data: Any) -> None:
+        if current_user.get_miniverse_role(miniverse_id) < Role.MODERATOR:
+            raise NotAuthorizedException("You are not authorized to write files in this miniverse")
+
+        miniverse = await get_miniverse(miniverse_id, db)
+
+        if not "content" in data:
+            raise ValueError("Missing 'content' field")
+
+        return set_file_content(miniverse, path, data["content"])

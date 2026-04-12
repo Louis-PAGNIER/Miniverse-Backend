@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from litestar.exceptions import HTTPException
+from litestar.response import File
+
 import zipstream
 from litestar import Response
 from litestar.concurrency import sync_to_thread
@@ -97,9 +100,15 @@ async def _extract_zip(
     await sync_to_thread(extract)
 
 
-def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo]:
+def list_miniverse_files(miniverse: Miniverse, user_path: Path) -> list[FileInfo] | None:
     miniverse_data_path = get_miniverse_path(miniverse.id) / 'data'
     safe_path = safe_user_path(miniverse_data_path, user_path)
+
+    if not safe_path.exists():
+        raise ValueError(f"Specified does not exist: {user_path}")
+
+    if safe_path.is_file():
+        return None
 
     files = []
     for path in Path(safe_path).glob("*"):
@@ -288,3 +297,31 @@ def rename_file(miniverse: Miniverse, path: Path, new_name: str):
         raise ValueError(f"File {new_path_safe} already exists")
 
     file_to_rename.rename(new_path_safe)
+
+
+def get_file_content(miniverse: Miniverse, path: Path) -> File:
+    base_path = get_miniverse_path(miniverse.id) / "data"
+    file_to_read = safe_user_path(base_path, path)
+
+    if file_to_read.is_dir():
+        raise ValueError(f"{file_to_read} is a directory")
+
+    if file_to_read.is_file():
+        if file_to_read.stat().st_size >= 15_000_000:
+            raise HTTPException(status_code=480, detail="File too large")
+        return File(path=file_to_read, encoding="utf-8")
+
+    raise ValueError(f"File {file_to_read} does not exist")
+
+
+def set_file_content(miniverse: Miniverse, path: Path, content: str):
+    base_path = get_miniverse_path(miniverse.id) / "data"
+    file_to_write = safe_user_path(base_path, path)
+
+    if file_to_write.is_dir():
+        raise ValueError(f"Directory {file_to_write} already exists")
+
+    if file_to_write.is_file():
+        file_to_write.write_text(content, encoding="utf-8")
+    else:
+        raise ValueError(f"File {file_to_write} does not exist")

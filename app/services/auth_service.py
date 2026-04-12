@@ -76,5 +76,5 @@ jwtAuth = JWTCookieAuth[User](
     retrieve_user_handler=retrieve_user_handler,
     token_secret=get_keycloak_public_key(),
     algorithm="RS256",
-    exclude=["/docs"]
+    exclude=["/docs", "/api-internal/mc-router"]
 )

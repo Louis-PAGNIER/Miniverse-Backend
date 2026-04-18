@@ -45,6 +45,8 @@ async def handle_miniverse_channel_message(message: bytes,
 
     if event.miniverse_id is None or max_user_role >= Role.USER:
         await socket.send_json(event)
+    else:
+        logger.debug(f"User {event.miniverse_id}, {max_user_role}")
 
 
 async def send_init_data(socket: WebSocket, ctx: WebsocketContext, db: AsyncSession):

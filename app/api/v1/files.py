@@ -1,12 +1,9 @@
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
 from litestar import Controller, get, post, Response, MediaType
-from litestar.datastructures import UploadFile
 from litestar.di import Provide
-from litestar.enums import RequestEncodingType
 from litestar.exceptions import NotAuthorizedException, NotFoundException
-from litestar.params import Body
 from litestar.response import File
 from sqlalchemy.ext.asyncio import AsyncSession
 
